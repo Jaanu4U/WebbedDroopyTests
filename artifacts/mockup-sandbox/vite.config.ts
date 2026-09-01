@@ -32,14 +32,17 @@ export default defineConfig({
   plugins: [
     {
       name: "mockup-app-entry",
-      transformIndexHtml() {
-        return [
-          {
-            tag: "script",
-            attrs: { type: "module", src: "/src/main.tsx" },
-            injectTo: "body",
-          },
-        ];
+      transformIndexHtml: {
+        order: "pre",
+        handler() {
+          return [
+            {
+              tag: "script",
+              attrs: { type: "module", src: "/src/main.tsx" },
+              injectTo: "body",
+            },
+          ];
+        },
       },
     },
     mockupPreviewPlugin(),
