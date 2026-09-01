@@ -514,6 +514,97 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/RequestRecord"
+  /workforce/workbench:
+    get:
+      operationId: getWorkforceWorkbench
+      tags: [operations]
+      summary: Get persisted workforce planning, compliance, command, finance and audit data
+      parameters:
+        - name: kind
+          in: query
+          schema: { type: string }
+        - name: status
+          in: query
+          schema: { type: string }
+      responses:
+        "200":
+          description: Workbench records, audit history and operational metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkforceWorkbench"
+  /workforce/items:
+    post:
+      operationId: createWorkforceItem
+      tags: [operations]
+      summary: Create a workforce planning, compliance, command, finance or reporting item
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkforceItemInput"
+      responses:
+        "201":
+          description: Created workforce item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkforceItem"
+  /workforce/items/{id}:
+    patch:
+      operationId: updateWorkforceItem
+      tags: [operations]
+      summary: Update a workforce item
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkforceItemUpdate"
+      responses:
+        "200":
+          description: Updated workforce item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkforceItem"
+  /workforce/items/{id}/transition:
+    post:
+      operationId: transitionWorkforceItem
+      tags: [operations]
+      summary: Transition a workforce item and record the action in audit history
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkforceItemTransition"
+      responses:
+        "200":
+          description: Transitioned workforce item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkforceItem"
+  /workforce/audit:
+    get:
+      operationId: getWorkforceAudit
+      tags: [operations]
+      summary: Get attributable workforce audit history
+      responses:
+        "200":
+          description: Audit history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AuditEvent"
 components:
   parameters:
     Id:
@@ -805,6 +896,110 @@ components:
         billSubmissionEnabled: { type: boolean }
         billMaxAmount: { type: number, minimum: 1 }
         billReceiptRequired: { type: boolean }
+    WorkforceItem:
+      type: object
+      required: [id, kind, status, title, description, priority, site, city, ownerId, assigneeId, dueAt, data, createdBy, closedAt, createdAt, updatedAt]
+      properties:
+        id: { type: string }
+        kind: { type: string }
+        status: { type: string }
+        title: { type: string }
+        description: { type: string }
+        priority: { type: string }
+        site: { type: ["string", "null"] }
+        city: { type: ["string", "null"] }
+        ownerId: { type: ["string", "null"] }
+        assigneeId: { type: ["string", "null"] }
+        dueAt: { type: ["string", "null"] }
+        data:
+          type: object
+          additionalProperties: true
+        createdBy: { type: string }
+        closedAt: { type: ["string", "null"] }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+    WorkforceItemInput:
+      type: object
+      required: [kind, title]
+      properties:
+        kind: { type: string, minLength: 1 }
+        status: { type: string }
+        title: { type: string, minLength: 1 }
+        description: { type: string }
+        priority: { type: string }
+        site: { type: string }
+        city: { type: string }
+        ownerId: { type: string }
+        assigneeId: { type: string }
+        dueAt: { type: string, nullable: true }
+        data:
+          type: object
+          additionalProperties: true
+    WorkforceItemUpdate:
+      type: object
+      properties:
+        status: { type: string }
+        title: { type: string, minLength: 1 }
+        description: { type: string }
+        priority: { type: string }
+        site: { type: string, nullable: true }
+        city: { type: string, nullable: true }
+        ownerId: { type: string, nullable: true }
+        assigneeId: { type: string, nullable: true }
+        dueAt: { type: string, nullable: true }
+        data:
+          type: object
+          additionalProperties: true
+    WorkforceItemTransition:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, minLength: 1 }
+        note: { type: string }
+    AuditEvent:
+      type: object
+      required: [id, entityType, entityId, action, actorId, summary, metadata, createdAt]
+      properties:
+        id: { type: string }
+        entityType: { type: string }
+        entityId: { type: string }
+        action: { type: string }
+        actorId: { type: string }
+        summary: { type: string }
+        metadata:
+          type: object
+          additionalProperties: true
+        createdAt: { type: string }
+    WorkforceMetrics:
+      type: object
+      required: [openPosts, atRiskPosts, noShows, pendingApprovals, expiringCredentials, openIncidents, activeSos, overdueTasks, unresolvedAttendance, coverage, attendance, patrolCompletion]
+      properties:
+        openPosts: { type: number }
+        atRiskPosts: { type: number }
+        noShows: { type: number }
+        pendingApprovals: { type: number }
+        expiringCredentials: { type: number }
+        openIncidents: { type: number }
+        activeSos: { type: number }
+        overdueTasks: { type: number }
+        unresolvedAttendance: { type: number }
+        coverage: { type: number }
+        attendance: { type: number }
+        patrolCompletion: { type: number }
+    WorkforceWorkbench:
+      type: object
+      required: [items, audit, metrics]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkforceItem"
+        audit:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        metrics:
+          $ref: "#/components/schemas/WorkforceMetrics"
     OperatingPolicy:
       type: object
       required: [id, version, siteName, siteAddress, timezone, shifts, geofenceRadiusMeters, geofenceRequireInside, tracking, checklist, sosAcknowledgementMinutes, sosEscalationMessage, approvals, requests, updatedAt, updatedBy]

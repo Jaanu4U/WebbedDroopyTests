@@ -37,6 +37,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import NotFound from '@/pages/not-found';
+import { WorkforceWorkbenchPage } from '@/pages/workforce-workbench';
 
 const queryClient = new QueryClient();
 const clerkPubKey = publishableKeyFromHost(
@@ -67,12 +68,14 @@ const AccessContext = createContext<Access | null>(null);
 const RoleContext = createContext<WorkforceRole>('Control Room');
 const nav = [
   { href: '/dashboard', label: 'Command center', icon: LayoutDashboard, roles: ['Guard', 'Supervisor', 'Security Officer', 'Field Officer', 'Management', 'Control Room'] as WorkforceRole[] },
+  { href: '/operations', label: 'Operations', icon: ActivityIcon, roles: ['Supervisor', 'Security Officer', 'Management', 'Control Room'] as WorkforceRole[] },
   { href: '/attendance', label: 'Attendance', icon: Clock3 },
   { href: '/team', label: 'Team readiness', icon: Users, roles: ['Supervisor', 'Security Officer', 'Management', 'Control Room'] as WorkforceRole[] },
   { href: '/tracking', label: 'Live tracking', icon: LocateFixed, roles: ['Supervisor', 'Security Officer', 'Field Officer', 'Management', 'Control Room'] as WorkforceRole[] },
   { href: '/verification', label: 'Verification', icon: FileCheck2, roles: ['Supervisor', 'Security Officer', 'Management', 'Control Room'] as WorkforceRole[] },
   { href: '/requests', label: 'Requests', icon: ReceiptText },
   { href: '/payslips', label: 'Payslips', icon: WalletCards },
+  { href: '/client-portal', label: 'Client portal', icon: ArrowUpRight, roles: ['Management', 'Control Room'] as WorkforceRole[] },
   { href: '/policies', label: 'Operating policies', icon: Settings2, roles: ['Management'] as WorkforceRole[] },
   { href: '/access', label: 'Access management', icon: UserCog, roles: ['Management'] as WorkforceRole[] },
 ];
@@ -385,12 +388,14 @@ function SectionHeading({ eyebrow, title, action }: { eyebrow?: string; title: s
 const allRoles: WorkforceRole[] = ['Guard', 'Supervisor', 'Security Officer', 'Field Officer', 'Management', 'Control Room'];
 const routeRoles: Record<string, WorkforceRole[]> = {
   '/dashboard': allRoles,
+  '/operations': ['Supervisor', 'Security Officer', 'Management', 'Control Room'],
   '/attendance': allRoles,
   '/team': ['Supervisor', 'Security Officer', 'Management', 'Control Room'],
   '/tracking': ['Supervisor', 'Security Officer', 'Field Officer', 'Management', 'Control Room'],
   '/verification': ['Supervisor', 'Security Officer', 'Management', 'Control Room'],
   '/requests': allRoles,
   '/payslips': allRoles,
+  '/client-portal': ['Management', 'Control Room'],
   '/policies': ['Management'],
   '/access': ['Management'],
 };
@@ -434,8 +439,8 @@ function Shell({ children }: { children: ReactNode }) {
         <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[hsl(var(--sidebar-primary))] text-[hsl(var(--sidebar-primary-foreground))]"><Shield size={19} strokeWidth={2.5} /></div>
         <div className="brand-copy"><div className="font-['Space_Grotesk'] text-[15px] font-bold tracking-[-.03em]">BLACKBELT</div><div className="mono text-[9px] tracking-[.14em] text-[hsl(44_20%_57%)]">COMMANDOS</div></div>
       </div>
-      <div className="px-3"><div className="nav-group">Operations</div>{visibleNav.slice(0, 4).map(({ href, label, icon: Icon }) => <Link href={href} key={href} className={cx('nav-item', location === href && 'active')} data-testid={`link-${label.toLowerCase().replace(/\s+/g, '-')}`}><Icon /><span>{label}</span></Link>)}
-      <div className="nav-group">Workforce</div>{visibleNav.slice(4).map(({ href, label, icon: Icon }) => <Link href={href} key={href} className={cx('nav-item', location === href && 'active')} data-testid={`link-${label.toLowerCase().replace(/\s+/g, '-')}`}><Icon /><span>{label}</span></Link>)}</div>
+      <div className="px-3"><div className="nav-group">Operations</div>{visibleNav.slice(0, 5).map(({ href, label, icon: Icon }) => <Link href={href} key={href} className={cx('nav-item', location === href && 'active')} data-testid={`link-${label.toLowerCase().replace(/\s+/g, '-')}`}><Icon /><span>{label}</span></Link>)}
+      <div className="nav-group">Workforce</div>{visibleNav.slice(5).map(({ href, label, icon: Icon }) => <Link href={href} key={href} className={cx('nav-item', location === href && 'active')} data-testid={`link-${label.toLowerCase().replace(/\s+/g, '-')}`}><Icon /><span>{label}</span></Link>)}</div>
       <div className="mt-auto px-4 pb-5"><div className="sidebar-foot-copy mb-3 rounded-lg border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent))] p-3"><div className="eyebrow !text-[hsl(var(--accent))]">Duty posture</div><div className="mt-2 flex items-center gap-2 text-xs font-bold"><span className="h-2 w-2 rounded-full bg-[hsl(155_50%_54%)]" /> {access.siteName}</div></div><div className="flex items-center gap-2 border-t border-[hsl(var(--sidebar-border))] pt-4"><div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[hsl(var(--accent))] text-xs font-extrabold text-[hsl(var(--accent-foreground))]">{initials(displayName)}</div><div className="sidebar-foot-copy min-w-0"><div className="truncate text-xs font-bold">{displayName}</div><div className="truncate text-[10px] text-[hsl(44_20%_57%)]">{role}</div></div></div></div>
     </aside>
     <div className="main-area">
@@ -947,7 +952,7 @@ function ProtectedRoutes() {
 
 function Router() {
   const [location] = useLocation();
-  return <ErrorBoundary resetKey={location}><Shell><Switch><Route path="/dashboard"><RoleRoute path="/dashboard"><Dashboard /></RoleRoute></Route><Route path="/attendance"><RoleRoute path="/attendance"><Attendance /></RoleRoute></Route><Route path="/team"><RoleRoute path="/team"><Team /></RoleRoute></Route><Route path="/tracking"><RoleRoute path="/tracking"><Tracking /></RoleRoute></Route><Route path="/verification"><RoleRoute path="/verification"><Verification /></RoleRoute></Route><Route path="/requests"><RoleRoute path="/requests"><Requests /></RoleRoute></Route><Route path="/payslips"><RoleRoute path="/payslips"><Payslips /></RoleRoute></Route><Route path="/policies"><RoleRoute path="/policies"><PolicySettings /></RoleRoute></Route><Route path="/access"><RoleRoute path="/access"><AccessManagement /></RoleRoute></Route><Route component={NotFound} /></Switch></Shell></ErrorBoundary>;
+  return <ErrorBoundary resetKey={location}><Shell><Switch><Route path="/dashboard"><RoleRoute path="/dashboard"><Dashboard /></RoleRoute></Route><Route path="/operations"><RoleRoute path="/operations"><WorkforceWorkbenchPage /></RoleRoute></Route><Route path="/attendance"><RoleRoute path="/attendance"><Attendance /></RoleRoute></Route><Route path="/team"><RoleRoute path="/team"><Team /></RoleRoute></Route><Route path="/tracking"><RoleRoute path="/tracking"><Tracking /></RoleRoute></Route><Route path="/verification"><RoleRoute path="/verification"><Verification /></RoleRoute></Route><Route path="/requests"><RoleRoute path="/requests"><Requests /></RoleRoute></Route><Route path="/payslips"><RoleRoute path="/payslips"><Payslips /></RoleRoute></Route><Route path="/client-portal"><RoleRoute path="/client-portal"><WorkforceWorkbenchPage readOnly /></RoleRoute></Route><Route path="/policies"><RoleRoute path="/policies"><PolicySettings /></RoleRoute></Route><Route path="/access"><RoleRoute path="/access"><AccessManagement /></RoleRoute></Route><Route component={NotFound} /></Switch></Shell></ErrorBoundary>;
 }
 
 const clerkAppearance = {

@@ -6,10 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface BillSubmissionInput {
-  category: string;
-  amount: number;
-  billDate: string;
-  vendor: string;
-  receiptReference?: string;
+export interface WorkforceItemTransition {
+  /** @minLength 1 */
+  status: string;
+  note?: string;
 }

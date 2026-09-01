@@ -2,3 +2,4 @@
 - [API codegen integer compatibility](api-codegen-zod-compat.md) — use numeric OpenAPI schemas for positive integer-like fields when the installed Zod runtime lacks `zod.int()`.
 - [GitHub connector HTML uploads](github-connector-html-uploads.md) — avoid literal executable script tags in tracked HTML when publishing this workspace through the connector proxy.
 - [Workspace dependency audit overrides](dependency-audit-overrides.md) — refresh the lockfile and use narrow root overrides when transitive ranges retain patched-compatible vulnerable versions.
+- [API client DOM iterable types](api-client-dom-iterable.md) — Orval fetch clients need `dom.iterable` so `Headers.entries()` typechecks.

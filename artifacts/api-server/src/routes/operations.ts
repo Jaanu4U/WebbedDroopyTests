@@ -1,10 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { clerkClient } from "@clerk/express";
-import { asc, desc, and, eq, notInArray } from "drizzle-orm";
+import { asc, desc, and, eq, notInArray, or } from "drizzle-orm";
 import {
   db,
   attendanceRecordsTable,
+  auditEventsTable,
   checklistItemsTable,
   employeeSubmissionsTable,
   guardsTable,
@@ -12,6 +13,7 @@ import {
   sosAlertsTable,
   operatingPoliciesTable,
   operatingPolicyRevisionsTable,
+  workforceItemsTable,
 } from "@workspace/db";
 import {
   PunchAttendanceBody,
@@ -33,6 +35,12 @@ import {
   UpdateOperatingPolicyBody,
   UpdateAdminWorkforceUserAssignmentBody,
   UpdateAdminWorkforceUserAssignmentParams,
+  GetWorkforceWorkbenchQueryParams,
+  CreateWorkforceItemBody,
+  UpdateWorkforceItemParams,
+  UpdateWorkforceItemBody,
+  TransitionWorkforceItemParams,
+  TransitionWorkforceItemBody,
 } from "@workspace/api-zod";
 import {
   assignmentFromMetadata,
@@ -717,6 +725,124 @@ async function seedOperationalData() {
     { id: "sub-002", name: "Priya Menon", phone: "+91 99887 10293", city: "Bengaluru", submittedBy: "Rohan Desai", submittedAt: atTime(offsetDate(today, -1), "16:18"), status: "Sent Back", documents: 3, note: "Please provide updated address proof" },
     { id: "sub-003", name: "Suresh Babu", phone: "+91 91234 87654", city: "Mysuru", submittedBy: "Amit Kulkarni", submittedAt: atTime(offsetDate(today, -1), "11:06"), status: "Accepted", documents: 5, note: null },
   ]).onConflictDoNothing();
+
+  const seedItems = [
+    {
+      id: "wf-roster-001",
+      kind: "roster",
+      status: "Published",
+      title: "Morning roster · Northgate Business Park",
+      description: "Published shift plan with post coverage and relief ownership.",
+      priority: "normal",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { shift: "Morning", headcount: 18, posts: 18, locked: true, reliefPool: 2 },
+    },
+    {
+      id: "wf-coverage-001",
+      kind: "coverage",
+      status: "At risk",
+      title: "Loading bay post needs relief",
+      description: "One absence is creating a gap in the active roster.",
+      priority: "high",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { post: "Loading Bay", scheduled: 3, present: 2, replacementRequired: true },
+    },
+    {
+      id: "wf-credential-001",
+      kind: "credential",
+      status: "Expiring",
+      title: "Guard licence renewal · Rakesh Patel",
+      description: "Licence expires within the configured compliance window.",
+      priority: "high",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { employee: "Rakesh Patel", credential: "PSARA licence", expiresOn: offsetDate(today, 18), verification: "Pending" },
+    },
+    {
+      id: "wf-task-001",
+      kind: "task",
+      status: "In progress",
+      title: "Perimeter inspection evidence",
+      description: "Capture a live image and note exceptions at the east perimeter.",
+      priority: "normal",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { assignee: "Vikram Singh", evidenceRequired: true, evidenceType: "live-image", checklist: "East perimeter" },
+    },
+    {
+      id: "wf-incident-001",
+      kind: "incident",
+      status: "Investigating",
+      title: "Unauthorised access attempt · Gate A",
+      description: "Control Room has assigned an investigator and preserved the event trail.",
+      priority: "critical",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { severity: "High", reportedBy: "Gate A", investigationOwner: "Control Room", evidenceCount: 2 },
+    },
+    {
+      id: "wf-sos-001",
+      kind: "sos",
+      status: "Acknowledged",
+      title: "SOS drill · Parking P2",
+      description: "Acknowledged alert with dispatch and escalation timers recorded.",
+      priority: "high",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { triggeredBy: "Sanjay Rao", acknowledgedAt: atTime(today, "09:12"), dispatchId: "dispatch-001", drill: true },
+    },
+    {
+      id: "wf-handover-001",
+      kind: "handover",
+      status: "Pending sign-off",
+      title: "Evening shift handover",
+      description: "Incoming Supervisor must accept open posts, keys and exceptions.",
+      priority: "normal",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { outgoing: "Amit Kulkarni", incoming: "Meera Nair", openExceptions: 2, assets: 14 },
+    },
+    {
+      id: "wf-leave-001",
+      kind: "leave",
+      status: "Pending approval",
+      title: "Leave request · Priya Menon",
+      description: "Leave request is waiting for the configured approval path.",
+      priority: "normal",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { employee: "Priya Menon", from: offsetDate(today, 3), to: offsetDate(today, 5), type: "Annual" },
+    },
+    {
+      id: "wf-payroll-001",
+      kind: "payroll_reconciliation",
+      status: "Needs review",
+      title: "August payroll reconciliation",
+      description: "Three attendance exceptions need resolution before payroll release.",
+      priority: "high",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { period: "August 2026", totalEmployees: 42, matched: 39, exceptions: 3, locked: false },
+    },
+    {
+      id: "wf-client-001",
+      kind: "client_portal",
+      status: "Published",
+      title: "Client service report · Northgate",
+      description: "Read-only client view of coverage, attendance, patrol and open issues.",
+      priority: "normal",
+      site: policy.siteName,
+      city: "Bengaluru",
+      data: { coverage: 92, attendance: 88, patrolCompletion: 96, openIssues: 3, visibility: "client" },
+    },
+  ] as const;
+  await db.insert(workforceItemsTable).values(seedItems.map((item) => ({
+    ...item,
+    createdBy: "system",
+    data: item.data as Record<string, unknown>,
+  }))).onConflictDoNothing();
 }
 
 let seedPromise: Promise<void> | undefined;
@@ -734,6 +860,156 @@ router.use(async (_req, _res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+function auditSummary(item: { kind: string; title: string }, action: string, actorId: string, note?: string) {
+  return {
+    id: randomUUID(),
+    entityType: "workforce_item",
+    entityId: item.title,
+    action,
+    actorId,
+    summary: note?.trim() || `${action} · ${item.kind} · ${item.title}`,
+    metadata: { kind: item.kind },
+  };
+}
+
+function isVisibleToAccess(item: typeof workforceItemsTable.$inferSelect, access: WorkforceAccess) {
+  return ["Management", "Control Room"].includes(access.role)
+    || !item.site
+    || item.site === access.siteName;
+}
+
+function workbenchMetrics(items: Array<typeof workforceItemsTable.$inferSelect>) {
+  const count = (predicate: (item: typeof workforceItemsTable.$inferSelect) => boolean) =>
+    items.filter(predicate).length;
+  const open = (item: typeof workforceItemsTable.$inferSelect) =>
+    !["Completed", "Closed", "Approved", "Published", "Resolved", "Cancelled"].includes(item.status);
+  return {
+    openPosts: count((item) => ["roster", "coverage", "replacement"].includes(item.kind) && open(item)),
+    atRiskPosts: count((item) => item.status.toLowerCase().includes("risk") || item.priority === "critical"),
+    noShows: count((item) => item.kind === "attendance_exception" && item.status !== "Resolved"),
+    pendingApprovals: count((item) => item.status.toLowerCase().includes("pending") || item.status.toLowerCase().includes("review")),
+    expiringCredentials: count((item) => item.kind === "credential" && item.status !== "Verified"),
+    openIncidents: count((item) => ["incident", "event"].includes(item.kind) && open(item)),
+    activeSos: count((item) => item.kind === "sos" && !["Closed", "Resolved", "Cancelled"].includes(item.status)),
+    overdueTasks: count((item) => Boolean(item.kind === "task" && item.dueAt && item.dueAt.getTime() < Date.now() && open(item))),
+    unresolvedAttendance: count((item) => ["attendance_exception", "attendance_correction", "late_alert"].includes(item.kind) && open(item)),
+    coverage: 92,
+    attendance: 88,
+    patrolCompletion: 96,
+  };
+}
+
+router.get("/workforce/workbench", async (req, res) => {
+  const access = req.workforceAccess;
+  if (!access) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const query = GetWorkforceWorkbenchQueryParams.parse(req.query);
+  const rows = await db.select().from(workforceItemsTable).orderBy(desc(workforceItemsTable.updatedAt));
+  const items = rows.filter((item) =>
+    isVisibleToAccess(item, access)
+    && (!query.kind || item.kind === query.kind)
+    && (!query.status || item.status === query.status),
+  );
+  const audit = await db.select().from(auditEventsTable).orderBy(desc(auditEventsTable.createdAt)).limit(100);
+  res.json({ items, audit, metrics: workbenchMetrics(items) });
+});
+
+router.post("/workforce/items", requireRole("Supervisor", "Security Officer", "Field Officer", "Management", "Control Room"), async (req, res) => {
+  const access = req.workforceAccess;
+  const body = CreateWorkforceItemBody.parse(req.body);
+  if (!access) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const id = `wf-${randomUUID()}`;
+  const [item] = await db.insert(workforceItemsTable).values({
+    id,
+    kind: body.kind,
+    status: body.status ?? "Open",
+    title: body.title.trim(),
+    description: body.description?.trim() ?? "",
+    priority: body.priority ?? "normal",
+    site: body.site?.trim() || access.siteName,
+    city: body.city?.trim() || null,
+    ownerId: body.ownerId ?? access.userId,
+    assigneeId: body.assigneeId ?? null,
+    dueAt: body.dueAt ? new Date(body.dueAt) : null,
+    data: body.data ?? {},
+    createdBy: access.userId,
+  }).returning();
+  if (!item) {
+    res.status(500).json({ error: "The workforce item could not be created." });
+    return;
+  }
+  await db.insert(auditEventsTable).values(auditSummary(item, "Created", access.userId));
+  res.status(201).json(item);
+});
+
+router.patch("/workforce/items/:id", requireRole("Supervisor", "Security Officer", "Field Officer", "Management", "Control Room"), async (req, res) => {
+  const access = req.workforceAccess;
+  const { id } = UpdateWorkforceItemParams.parse(req.params);
+  const body = UpdateWorkforceItemBody.parse(req.body);
+  if (!access) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const [current] = await db.select().from(workforceItemsTable).where(eq(workforceItemsTable.id, id)).limit(1);
+  if (!current || !isVisibleToAccess(current, access)) {
+    res.status(404).json({ error: "Workforce item not found." });
+    return;
+  }
+  const [item] = await db.update(workforceItemsTable).set({
+    ...(body.status !== undefined ? { status: body.status } : {}),
+    ...(body.title !== undefined ? { title: body.title.trim() } : {}),
+    ...(body.description !== undefined ? { description: body.description.trim() } : {}),
+    ...(body.priority !== undefined ? { priority: body.priority } : {}),
+    ...(body.site !== undefined ? { site: body.site } : {}),
+    ...(body.city !== undefined ? { city: body.city } : {}),
+    ...(body.ownerId !== undefined ? { ownerId: body.ownerId } : {}),
+    ...(body.assigneeId !== undefined ? { assigneeId: body.assigneeId } : {}),
+    ...(body.dueAt !== undefined ? { dueAt: body.dueAt ? new Date(body.dueAt) : null } : {}),
+    ...(body.data !== undefined ? { data: body.data } : {}),
+  }).where(eq(workforceItemsTable.id, id)).returning();
+  if (!item) {
+    res.status(404).json({ error: "Workforce item not found." });
+    return;
+  }
+  await db.insert(auditEventsTable).values(auditSummary(item, "Updated", access.userId));
+  res.json(item);
+});
+
+router.post("/workforce/items/:id/transition", requireRole("Supervisor", "Security Officer", "Field Officer", "Management", "Control Room"), async (req, res) => {
+  const access = req.workforceAccess;
+  const { id } = TransitionWorkforceItemParams.parse(req.params);
+  const body = TransitionWorkforceItemBody.parse(req.body);
+  if (!access) {
+    res.status(401).json({ error: "Authentication required" });
+    return;
+  }
+  const [current] = await db.select().from(workforceItemsTable).where(eq(workforceItemsTable.id, id)).limit(1);
+  if (!current || !isVisibleToAccess(current, access)) {
+    res.status(404).json({ error: "Workforce item not found." });
+    return;
+  }
+  const closed = ["Completed", "Closed", "Approved", "Published", "Resolved", "Cancelled"].includes(body.status);
+  const [item] = await db.update(workforceItemsTable).set({
+    status: body.status,
+    closedAt: closed ? new Date() : null,
+  }).where(eq(workforceItemsTable.id, id)).returning();
+  if (!item) {
+    res.status(404).json({ error: "Workforce item not found." });
+    return;
+  }
+  await db.insert(auditEventsTable).values(auditSummary(item, `Transitioned to ${body.status}`, access.userId, body.note));
+  res.json(item);
+});
+
+router.get("/workforce/audit", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (_req, res) => {
+  res.json(await db.select().from(auditEventsTable).orderBy(desc(auditEventsTable.createdAt)).limit(100));
 });
 
 router.get("/session", (req, res) => {
