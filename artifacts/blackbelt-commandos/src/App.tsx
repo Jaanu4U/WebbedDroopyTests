@@ -18,6 +18,7 @@ import {
   useCreateLeaveRequest, useCreateSalaryAdvanceRequest, useDecideEmployeeSubmission,
   useGetActivity, useGetDashboardSummary, useGetEmployeeSubmissions,
   useGetEscalationContacts, useGetFieldOfficerTracking, useGetPayslips,
+  usePostLocationHeartbeat,
   useGetRequests, useGetTeamGuards, useGetTodayAttendance, useGetTodayChecklist, useGetTodaySiteReport,
   getGetOperatingPolicyQueryKey, useGetOperatingPolicy, usePunchAttendance,
   getGetOperatingPolicyRevisionsQueryKey, useGetOperatingPolicyRevisions,
@@ -44,7 +45,12 @@ const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
   import.meta.env.VITE_CLERK_PUBLISHABLE_KEY,
 );
-const clerkProxyUrl = import.meta.env.VITE_CLERK_PROXY_URL;
+// Replit injects the managed proxy secret into the development process too,
+// but the proxy is only valid for published traffic. Keep preview on Clerk's
+// development Frontend API and enable the proxy in production.
+const clerkProxyUrl = import.meta.env.DEV
+  ? undefined
+  : import.meta.env.VITE_CLERK_PROXY_URL;
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 if (!clerkPubKey) {
@@ -485,7 +491,45 @@ function Attendance() {
   const punch = usePunchAttendance();
   const { toast } = useToast();
   const record = query.data as AttendanceRecord | undefined;
-  const performPunch = (action: 'in' | 'out') => punch.mutate({ data: { action, location: policy.data?.siteName || record?.site || 'Assigned site', geofenceVerified: true } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetTodayAttendanceQueryKey() }); toast({ title: action === 'in' ? 'Shift started' : 'Shift closed', description: 'Your attendance record is up to date.' }); }, onError: () => toast({ title: 'Punch failed', description: 'Please confirm you are inside the site geofence.', variant: 'destructive' }) });
+  const performPunch = (action: 'in' | 'out') => {
+    if (!navigator.geolocation) {
+      toast({ title: 'Location unavailable', description: 'This device does not provide GPS. Ask a supervisor to record a correction.', variant: 'destructive' });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const capturedAt = new Date(position.timestamp || Date.now()).toISOString();
+        punch.mutate({
+          data: {
+            action,
+            location: policy.data?.siteName || record?.site || 'Assigned site',
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracyMeters: position.coords.accuracy,
+            capturedAt,
+            source: 'online',
+            idempotencyKey: `${action}-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          },
+        }, {
+          onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: getGetTodayAttendanceQueryKey() });
+            toast({ title: action === 'in' ? 'Shift started' : 'Shift closed', description: 'Server verified your location and attendance event.' });
+          },
+          onError: (error: unknown) => toast({
+            title: 'Punch not accepted',
+            description: error instanceof Error ? error.message : 'Confirm you are inside the site geofence with a clear GPS signal.',
+            variant: 'destructive',
+          }),
+        });
+      },
+      (error) => toast({
+        title: 'Location permission needed',
+        description: error.message || 'Allow location access to record a verified attendance punch.',
+        variant: 'destructive',
+      }),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+    );
+  };
    return <div className="page-wrap"><div className="mb-8"><div className="eyebrow mb-3">Workforce / attendance</div><h1 className="page-title">Today’s attendance</h1><p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">Verify your shift presence against the assigned site geofence.</p></div>{query.isLoading ? <LoadingState rows={5} /> : query.isError ? <ErrorState onRetry={() => query.refetch()} /> : <div className="grid gap-6 lg:grid-cols-[1fr_.65fr]"><div className="card-surface overflow-hidden"><div className="flex items-center justify-between border-b border-[hsl(var(--border))] p-5"><div><div className="eyebrow mb-2">Live record</div><h2 className="section-title">{display(record?.employeeName, 'Assigned employee')}</h2></div><StatusPill value={display(record?.status, 'pending')} /></div><div className="grid gap-4 p-5 sm:grid-cols-2"><div><div className="field-label">Shift</div><div className="text-sm font-bold">{display(record?.shift)}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">Window {display(record?.shiftWindow)}</div></div><div><div className="field-label">Assigned site</div><div className="text-sm font-bold">{display(record?.site)}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">{display(record?.siteAddress)}</div></div><div><div className="field-label">Punch in</div><div className="mono text-sm">{fmtTime(record?.punchIn)}</div></div><div><div className="field-label">Punch out</div><div className="mono text-sm">{fmtTime(record?.punchOut)}</div></div></div><div className="mx-5 mb-5 rounded-lg border border-[hsl(var(--primary)_/_0.22)] bg-[hsl(var(--primary)_/_0.06)] p-4"><div className="flex gap-3"><LocateFixed className="mt-0.5 shrink-0 text-[hsl(var(--primary))]" size={18} /><div><div className="text-xs font-bold">Geofence policy · {display(record?.geofenceRadiusMeters, policy.data?.geofenceRadiusMeters ?? 0)}m</div><div className="mt-1 text-xs text-[hsl(var(--muted-foreground))]">{display(record?.geofence, 'Location context will be checked at punch time.')}</div></div></div></div><div className="flex flex-col gap-3 border-t border-[hsl(var(--border))] p-5 sm:flex-row"><button className="btn btn-primary flex-1" disabled={punch.isPending || Boolean(record?.punchIn)} onClick={() => performPunch('in')} data-testid="button-punch-in"><LogIn size={15} />{record?.punchIn ? `In at ${fmtTime(record.punchIn)}` : punch.isPending ? 'Recording…' : 'Punch in'}</button><button className="btn btn-secondary flex-1" disabled={punch.isPending || !record?.punchIn || Boolean(record?.punchOut)} onClick={() => performPunch('out')} data-testid="button-punch-out"><LogOut size={15} />{record?.punchOut ? `Out at ${fmtTime(record.punchOut)}` : 'Punch out'}</button></div></div><div className="card-surface p-5"><SectionHeading eyebrow="Operator guidance" title="A clean handover starts here" /><div className="space-y-4 text-xs leading-5 text-[hsl(var(--muted-foreground))]"><div className="flex gap-3"><CheckCircle2 className="shrink-0 text-[hsl(var(--primary))]" size={17} /><span>Stay inside the {display(record?.geofenceRadiusMeters, policy.data?.geofenceRadiusMeters ?? 0)}m assigned geofence when recording a punch.</span></div><div className="flex gap-3"><CheckCircle2 className="shrink-0 text-[hsl(var(--primary))]" size={17} /><span>Your supervisor sees attendance changes immediately.</span></div><div className="flex gap-3"><CheckCircle2 className="shrink-0 text-[hsl(var(--primary))]" size={17} /><span>Raise an SOS only for an active safety emergency.</span></div></div></div></div>}</div>;
 }
 
@@ -505,12 +549,34 @@ function Team() {
 function Tracking() {
   const [city, setCity] = useState('');
   const [dutyStatus, setDutyStatus] = useState('');
+  const role = useContext(RoleContext);
   const policy = useGetOperatingPolicy();
   const params = useMemo(() => ({ ...(city ? { city } : {}), ...(dutyStatus ? { dutyStatus } : {}) }), [city, dutyStatus]);
   const tracking = useGetFieldOfficerTracking(params, { query: { queryKey: getGetFieldOfficerTrackingQueryKey(params) } });
+  const heartbeat = usePostLocationHeartbeat();
   const locations = (tracking.data ?? []) as FieldOfficerLocation[];
   const trackingWindowOpen = policy.data?.tracking ? isPolicyWindowActive(policy.data.tracking.startTime, policy.data.tracking.endTime, policy.data.timezone) : false;
-  return <div className="page-wrap"><div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="eyebrow mb-3">Field network / location heartbeat</div><h1 className="page-title">Live tracking</h1><p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">Know where your field officers are and whether the next visit is moving.</p></div><div className="flex flex-wrap items-center justify-end gap-2"><span className={cx('status-pill', trackingWindowOpen ? 'status-ok' : 'status-neutral')}>{trackingWindowOpen ? 'Duty window open' : 'Tracking paused'}</span><select className="field !w-auto !min-w-[130px]" value={city} onChange={(e) => setCity(e.target.value)} data-testid="select-city"><option value="">All cities</option><option value="Mumbai">Mumbai</option><option value="Pune">Pune</option><option value="Nashik">Nashik</option></select><select className="field !w-auto !min-w-[130px]" value={dutyStatus} onChange={(e) => setDutyStatus(e.target.value)} data-testid="select-duty-status"><option value="">All statuses</option><option value="on_duty">On duty</option><option value="off_duty">Off duty</option></select></div></div>{!trackingWindowOpen && policy.data && <div className="mb-5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Field locations are hidden outside the authorized {policy.data.tracking.startTime}–{policy.data.tracking.endTime} window ({policy.data.timezone}).</div>}<div className="grid gap-6 xl:grid-cols-[1.4fr_.8fr]"><div className="map-canvas" data-testid="tracking-map"><div className="map-label left-[15%] top-[22%]">Andheri East</div><div className="map-label left-[59%] top-[15%]">Powai</div><div className="map-label left-[31%] top-[68%]">Bandra</div><div className="map-label left-[72%] top-[72%]">Fort</div>{locations.map((person, index) => <div key={person.id} className="map-marker" style={{ left: `${Math.min(Math.max(person.coordinates?.x ?? (20 + index * 18), 9), 86)}%`, top: `${Math.min(Math.max(person.coordinates?.y ?? (23 + index * 14), 12), 78)}%` }} title={person.name}><span>{index + 1}</span></div>)}<div className="absolute bottom-4 left-4 rounded-lg border border-white/70 bg-[hsl(44_40%_99%_/_0.88)] px-3 py-2 text-[10px] font-bold shadow-sm"><span className="mr-2 inline-block h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />{locations.length} officers reporting</div></div><div className="card-surface overflow-hidden"><div className="border-b border-[hsl(var(--border))] p-5"><div className="eyebrow mb-2">Roster pulse</div><h2 className="section-title">Field officers</h2></div>{tracking.isLoading ? <div className="p-5"><LoadingState /></div> : tracking.isError ? <div className="p-5"><ErrorState onRetry={() => tracking.refetch()} /></div> : locations.length === 0 ? <EmptyState icon={LocateFixed} title="No officers match" detail="Try a different city or duty status filter." /> : <div>{locations.map((person) => <div className="flex gap-3 border-b border-[hsl(var(--border))] p-4 last:border-0" key={person.id} data-testid={`officer-${person.id}`}><div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[hsl(var(--primary))] text-[10px] font-bold text-white">{initials(person.name)}</div><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><div className="truncate text-xs font-bold">{person.name}</div><StatusPill value={person.dutyStatus} /></div><div className="mt-1 flex items-center gap-1 text-[10px] text-[hsl(var(--muted-foreground))]"><MapPin size={10} />{person.location}, {person.city}</div><div className="mono mt-2 text-[9px] text-[hsl(var(--muted-foreground))]">Updated {display(person.lastUpdate)}</div></div></div>)}</div>}</div></div></div>;
+  const sendHeartbeat = () => {
+    if (!navigator.geolocation || !policy.data) return;
+    navigator.geolocation.getCurrentPosition((position) => {
+      heartbeat.mutate({
+        data: {
+          employeeName: 'Current Field Officer',
+          city: policy.data?.city ?? 'Bengaluru',
+          site: policy.data?.siteName,
+          dutyStatus: 'On duty',
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          accuracyMeters: position.coords.accuracy,
+          capturedAt: new Date(position.timestamp || Date.now()).toISOString(),
+          source: 'browser',
+        },
+      }, {
+        onSuccess: () => tracking.refetch(),
+      });
+    }, undefined, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+  };
+  return <div className="page-wrap"><div className="mb-7 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="eyebrow mb-3">Field network / location heartbeat</div><h1 className="page-title">Live tracking</h1><p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">Know where your field officers are and whether the next visit is moving.</p></div><div className="flex flex-wrap items-center justify-end gap-2"><span className={cx('status-pill', trackingWindowOpen ? 'status-ok' : 'status-neutral')}>{trackingWindowOpen ? 'Duty window open' : 'Tracking paused'}</span>{role === 'Field Officer' && <button className="btn btn-primary" onClick={sendHeartbeat} disabled={heartbeat.isPending || !trackingWindowOpen} data-testid="button-send-heartbeat"><LocateFixed size={14} />{heartbeat.isPending ? 'Sending…' : 'Send heartbeat'}</button>}<select className="field !w-auto !min-w-[130px]" value={city} onChange={(e) => setCity(e.target.value)} data-testid="select-city"><option value="">All cities</option><option value="Bengaluru">Bengaluru</option><option value="Mumbai">Mumbai</option><option value="Pune">Pune</option><option value="Nashik">Nashik</option></select><select className="field !w-auto !min-w-[130px]" value={dutyStatus} onChange={(e) => setDutyStatus(e.target.value)} data-testid="select-duty-status"><option value="">All statuses</option><option value="on_duty">On duty</option><option value="off_duty">Off duty</option></select></div></div>{!trackingWindowOpen && policy.data && <div className="mb-5 rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--muted))] p-3 text-xs text-[hsl(var(--muted-foreground))]">Field locations are hidden outside the authorized {policy.data.tracking.startTime}–{policy.data.tracking.endTime} window ({policy.data.timezone}).</div>}<div className="grid gap-6 xl:grid-cols-[1.4fr_.8fr]"><div className="map-canvas" data-testid="tracking-map"><div className="map-label left-[15%] top-[22%]">Andheri East</div><div className="map-label left-[59%] top-[15%]">Powai</div><div className="map-label left-[31%] top-[68%]">Bandra</div><div className="map-label left-[72%] top-[72%]">Fort</div>{locations.map((person, index) => <div key={person.id} className="map-marker" style={{ left: `${Math.min(Math.max(person.coordinates?.x ?? (20 + index * 18), 9), 86)}%`, top: `${Math.min(Math.max(person.coordinates?.y ?? (23 + index * 14), 12), 78)}%` }} title={person.name}><span>{index + 1}</span></div>)}<div className="absolute bottom-4 left-4 rounded-lg border border-white/70 bg-[hsl(44_40%_99%_/_0.88)] px-3 py-2 text-[10px] font-bold shadow-sm"><span className="mr-2 inline-block h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />{locations.length} officers reporting</div></div><div className="card-surface overflow-hidden"><div className="border-b border-[hsl(var(--border))] p-5"><div className="eyebrow mb-2">Roster pulse</div><h2 className="section-title">Field officers</h2></div>{tracking.isLoading ? <div className="p-5"><LoadingState /></div> : tracking.isError ? <div className="p-5"><ErrorState onRetry={() => tracking.refetch()} /></div> : locations.length === 0 ? <EmptyState icon={LocateFixed} title="No officers match" detail="Try a different city or duty status filter." /> : <div>{locations.map((person) => <div className="flex gap-3 border-b border-[hsl(var(--border))] p-4 last:border-0" key={person.id} data-testid={`officer-${person.id}`}><div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[hsl(var(--primary))] text-[10px] font-bold text-white">{initials(person.name)}</div><div className="min-w-0 flex-1"><div className="flex items-center justify-between gap-2"><div className="truncate text-xs font-bold">{person.name}</div><StatusPill value={person.dutyStatus} /></div><div className="mt-1 flex items-center gap-1 text-[10px] text-[hsl(var(--muted-foreground))]"><MapPin size={10} />{person.location}, {person.city}</div><div className="mono mt-2 text-[9px] text-[hsl(var(--muted-foreground))]">Updated {display(person.lastUpdate)} · {person.accuracyMeters ? `±${Math.round(person.accuracyMeters)}m` : 'accuracy unavailable'}{person.stale ? ' · stale' : ''}</div></div></div>)}</div>}</div></div></div>;
 }
 
 function Verification() {

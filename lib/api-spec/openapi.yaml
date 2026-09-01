@@ -234,6 +234,24 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AttendanceRecord"
+  /tracking/heartbeat:
+    post:
+      operationId: postLocationHeartbeat
+      tags: [operations]
+      summary: Record a Field Officer location heartbeat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LocationHeartbeatInput"
+      responses:
+        "201":
+          description: Persisted location heartbeat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LocationHeartbeat"
   /emergency/sos:
     get:
       operationId: getSosAlerts
@@ -265,6 +283,44 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SosAlert"
+  /emergency/sos/{id}/status:
+    patch:
+      operationId: transitionSos
+      tags: [operations]
+      summary: Transition an SOS through acknowledgement and dispatch
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SosStatusInput"
+      responses:
+        "200":
+          description: Updated SOS alert
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SosAlert"
+  /attendance/corrections:
+    post:
+      operationId: requestAttendanceCorrection
+      tags: [operations]
+      summary: Request an attendance correction with a reason
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttendanceCorrectionInput"
+      responses:
+        "201":
+          description: Correction request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceCorrection"
   /team/guards:
     get:
       operationId: getTeamGuards
@@ -376,6 +432,230 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/FieldOfficerLocation"
+  /patrol/checkpoints:
+    get:
+      operationId: getPatrolCheckpoints
+      tags: [operations]
+      summary: List configured QR patrol checkpoints
+      responses:
+        "200":
+          description: Patrol checkpoints
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PatrolCheckpoint"
+    post:
+      operationId: createPatrolCheckpoint
+      tags: [operations]
+      summary: Configure a QR patrol checkpoint
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatrolCheckpointInput"
+      responses:
+        "201":
+          description: Created checkpoint
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatrolCheckpoint"
+  /patrol/scans:
+    post:
+      operationId: recordPatrolScan
+      tags: [operations]
+      summary: Record a QR checkpoint scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatrolScanInput"
+      responses:
+        "201":
+          description: Recorded patrol scan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatrolScan"
+  /patrol/summary:
+    get:
+      operationId: getPatrolSummary
+      tags: [operations]
+      summary: Get persisted patrol completion metrics
+      responses:
+        "200":
+          description: Patrol metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatrolSummary"
+  /incidents:
+    get:
+      operationId: getIncidents
+      tags: [operations]
+      summary: List structured incidents
+      responses:
+        "200":
+          description: Incident records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Incident"
+    post:
+      operationId: createIncident
+      tags: [operations]
+      summary: Report a structured incident
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentInput"
+      responses:
+        "201":
+          description: Created incident
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+  /incidents/{id}/status:
+    patch:
+      operationId: transitionIncident
+      tags: [operations]
+      summary: Transition an incident through its control-room lifecycle
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IncidentStatusInput"
+      responses:
+        "200":
+          description: Updated incident
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Incident"
+  /roster/today:
+    get:
+      operationId: getTodayRoster
+      tags: [operations]
+      summary: List today's persisted roster assignments
+      responses:
+        "200":
+          description: Today's roster
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RosterAssignment"
+    post:
+      operationId: createRosterAssignment
+      tags: [operations]
+      summary: Add an assignment to today's roster
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RosterAssignmentInput"
+      responses:
+        "201":
+          description: Created roster assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RosterAssignment"
+  /compliance:
+    get:
+      operationId: getComplianceRecords
+      tags: [operations]
+      summary: List employee compliance records
+      responses:
+        "200":
+          description: Compliance records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ComplianceRecord"
+  /reports/today:
+    get:
+      operationId: getTodayOperationalReport
+      tags: [operations]
+      summary: Get today's persisted Daily Activity Report
+      responses:
+        "200":
+          description: Daily Activity Report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationalReport"
+    post:
+      operationId: submitTodayOperationalReport
+      tags: [operations]
+      summary: Submit or update today's Daily Activity Report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperationalReportInput"
+      responses:
+        "201":
+          description: Submitted report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationalReport"
+  /requests/{id}/status:
+    patch:
+      operationId: transitionRequest
+      tags: [operations]
+      summary: Approve or reject an employee request
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestStatusInput"
+      responses:
+        "200":
+          description: Updated request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestRecord"
+  /storage/uploads/request-url:
+    post:
+      operationId: requestEvidenceUploadUrl
+      tags: [operations]
+      summary: Create a short-lived private evidence upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvidenceUploadInput"
+      responses:
+        "200":
+          description: Signed upload target
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceUpload"
   /employee-submissions:
     get:
       operationId: getEmployeeSubmissions
@@ -690,7 +970,7 @@ components:
         tone: { type: string }
     AttendanceRecord:
       type: object
-      required: [id, employeeName, shift, site, status, punchIn, punchOut, geofence, siteAddress, geofenceRadiusMeters, shiftWindow]
+      required: [id, employeeName, shift, site, status, punchIn, punchOut, geofence, siteAddress, geofenceRadiusMeters, shiftWindow, punchInVerification, punchOutVerification]
       properties:
         id: { type: string }
         employeeName: { type: string }
@@ -700,6 +980,10 @@ components:
         punchIn: { type: ["string", "null"] }
         punchOut: { type: ["string", "null"] }
         geofence: { type: string }
+        punchInVerification: { type: ["string", "null"] }
+        punchOutVerification: { type: ["string", "null"] }
+        punchInAccuracyMeters: { type: ["number", "null"] }
+        punchOutAccuracyMeters: { type: ["number", "null"] }
         siteAddress: { type: string }
         geofenceRadiusMeters: { type: number }
         shiftWindow: { type: string }
@@ -712,6 +996,32 @@ components:
           enum: [in, out]
         location: { type: string }
         geofenceVerified: { type: boolean }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        accuracyMeters: { type: number, minimum: 0 }
+        capturedAt: { type: string, format: date-time }
+        source: { type: string, enum: [online, offline, supervisor] }
+        idempotencyKey: { type: string, minLength: 8 }
+    AttendanceCorrectionInput:
+      type: object
+      required: [attendanceId, action, reason]
+      properties:
+        attendanceId: { type: string }
+        action: { type: string, enum: [in, out] }
+        correctedAt: { type: string, format: date-time }
+        reason: { type: string, minLength: 5 }
+        evidence: { type: object, additionalProperties: true }
+    AttendanceCorrection:
+      type: object
+      required: [id, attendanceId, action, status, reason, requestedBy, requestedAt]
+      properties:
+        id: { type: string }
+        attendanceId: { type: string }
+        action: { type: string }
+        status: { type: string }
+        reason: { type: string }
+        requestedBy: { type: string }
+        requestedAt: { type: string }
     SosInput:
       type: object
       required: [employeeName, location]
@@ -731,6 +1041,14 @@ components:
         triggeredBy: { type: string }
         acknowledgementWindowMinutes: { type: number }
         acknowledgementDueAt: { type: string }
+    SosStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [Triggered, Delivered, Acknowledged, Dispatched, Safe, Escalated, Closed]
+        note: { type: string }
     Guard:
       type: object
       required: [id, name, role, post, shift, status, lastSeen]
@@ -778,7 +1096,7 @@ components:
         status: { type: string }
     FieldOfficerLocation:
       type: object
-      required: [id, name, city, dutyStatus, location, lastUpdate, coordinates, trackingWindow, heartbeatMinutes]
+      required: [id, name, city, dutyStatus, location, lastUpdate, coordinates, trackingWindow, heartbeatMinutes, latitude, longitude, accuracyMeters, stale]
       properties:
         id: { type: string }
         name: { type: string }
@@ -794,6 +1112,196 @@ components:
           properties:
             x: { type: number }
             y: { type: number }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        accuracyMeters: { type: ["number", "null"] }
+        stale: { type: boolean }
+    LocationHeartbeatInput:
+      type: object
+      required: [employeeName, city, latitude, longitude, capturedAt, dutyStatus]
+      properties:
+        employeeId: { type: string }
+        employeeName: { type: string, minLength: 1 }
+        city: { type: string, minLength: 1 }
+        site: { type: string }
+        dutyStatus: { type: string }
+        latitude: { type: number, minimum: -90, maximum: 90 }
+        longitude: { type: number, minimum: -180, maximum: 180 }
+        accuracyMeters: { type: number, minimum: 0 }
+        capturedAt: { type: string, format: date-time }
+        source: { type: string }
+        deviceId: { type: string }
+    LocationHeartbeat:
+      type: object
+      required: [id, employeeName, city, dutyStatus, latitude, longitude, capturedAt, receivedAt, stale]
+      properties:
+        id: { type: string }
+        employeeId: { type: ["string", "null"] }
+        employeeName: { type: string }
+        city: { type: string }
+        site: { type: ["string", "null"] }
+        dutyStatus: { type: string }
+        latitude: { type: number }
+        longitude: { type: number }
+        accuracyMeters: { type: ["number", "null"] }
+        capturedAt: { type: string }
+        receivedAt: { type: string }
+        stale: { type: boolean }
+    PatrolCheckpointInput:
+      type: object
+      required: [site, name, qrToken, sequence]
+      properties:
+        site: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        qrToken: { type: string, minLength: 4 }
+        sequence: { type: number, minimum: 1 }
+        latitude: { type: number }
+        longitude: { type: number }
+        radiusMeters: { type: number, minimum: 1 }
+    PatrolCheckpoint:
+      type: object
+      required: [id, site, name, qrToken, sequence, radiusMeters, active]
+      properties:
+        id: { type: string }
+        site: { type: string }
+        name: { type: string }
+        qrToken: { type: string }
+        sequence: { type: number }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        radiusMeters: { type: number }
+        active: { type: boolean }
+    PatrolScanInput:
+      type: object
+      required: [checkpointToken, roundId]
+      properties:
+        checkpointToken: { type: string, minLength: 4 }
+        roundId: { type: string, minLength: 1 }
+        latitude: { type: number }
+        longitude: { type: number }
+        accuracyMeters: { type: number }
+        note: { type: string }
+        evidence: { type: object, additionalProperties: true }
+    PatrolScan:
+      type: object
+      required: [id, checkpointId, roundId, scannedBy, scannedAt, status]
+      properties:
+        id: { type: string }
+        checkpointId: { type: string }
+        roundId: { type: string }
+        scannedBy: { type: string }
+        scannedAt: { type: string }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        accuracyMeters: { type: ["number", "null"] }
+        status: { type: string }
+        note: { type: ["string", "null"] }
+    PatrolSummary:
+      type: object
+      required: [rounds, completed, missed, completionPercent]
+      properties:
+        rounds: { type: number }
+        completed: { type: number }
+        missed: { type: number }
+        completionPercent: { type: number }
+    IncidentInput:
+      type: object
+      required: [category, severity, title, narrative]
+      properties:
+        category: { type: string }
+        severity: { type: string, enum: [Low, Medium, High, Critical] }
+        title: { type: string, minLength: 1 }
+        narrative: { type: string, minLength: 1 }
+        site: { type: string }
+        affectedPeople: { type: array, items: { type: string } }
+        affectedAssets: { type: array, items: { type: string } }
+        latitude: { type: number }
+        longitude: { type: number }
+        dueAt: { type: string, format: date-time }
+    Incident:
+      type: object
+      required: [id, category, severity, status, title, narrative, reportedAt, createdBy]
+      properties:
+        id: { type: string }
+        category: { type: string }
+        severity: { type: string }
+        status: { type: string }
+        title: { type: string }
+        narrative: { type: string }
+        site: { type: ["string", "null"] }
+        affectedPeople: { type: array, items: { type: string } }
+        affectedAssets: { type: array, items: { type: string } }
+        latitude: { type: ["number", "null"] }
+        longitude: { type: ["number", "null"] }
+        reportedAt: { type: string }
+        dueAt: { type: ["string", "null"] }
+        assignedTo: { type: ["string", "null"] }
+        createdBy: { type: string }
+    IncidentStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [Submitted, Acknowledged, Assigned, In Progress, Contained, Closed, Reopened]
+        note: { type: string }
+    RosterAssignmentInput:
+      type: object
+      required: [employeeId, employeeName, site, post, shift]
+      properties:
+        employeeId: { type: string }
+        employeeName: { type: string }
+        site: { type: string }
+        post: { type: string }
+        shift: { type: string }
+        rosterDate: { type: string }
+        replacementFor: { type: string }
+    RosterAssignment:
+      type: object
+      required: [id, employeeId, employeeName, site, post, shift, rosterDate, status]
+      properties:
+        id: { type: string }
+        employeeId: { type: string }
+        employeeName: { type: string }
+        site: { type: string }
+        post: { type: string }
+        shift: { type: string }
+        rosterDate: { type: string }
+        status: { type: string }
+        acknowledgedAt: { type: ["string", "null"] }
+        replacementFor: { type: ["string", "null"] }
+        lockedAt: { type: ["string", "null"] }
+        conflictReason: { type: ["string", "null"] }
+    ComplianceRecord:
+      type: object
+      required: [id, employeeId, employeeName, kind, status]
+      properties:
+        id: { type: string }
+        employeeId: { type: string }
+        employeeName: { type: string }
+        kind: { type: string }
+        reference: { type: ["string", "null"] }
+        status: { type: string }
+        expiresAt: { type: ["string", "null"] }
+        verifiedAt: { type: ["string", "null"] }
+    OperationalReportInput:
+      type: object
+      required: [site, data]
+      properties:
+        site: { type: string }
+        data: { type: object, additionalProperties: true }
+    OperationalReport:
+      type: object
+      required: [id, reportDate, site, status, data]
+      properties:
+        id: { type: string }
+        reportDate: { type: string }
+        site: { type: string }
+        status: { type: string }
+        submittedBy: { type: ["string", "null"] }
+        approvedBy: { type: ["string", "null"] }
+        approvedAt: { type: ["string", "null"] }
+        data: { type: object, additionalProperties: true }
     EmployeeSubmission:
       type: object
       required: [id, name, phone, city, submittedBy, submittedAt, status, documents, decisionAt, decisionBy, approvalPath]
@@ -846,6 +1354,26 @@ components:
         status: { type: string }
         submittedBy: { type: string }
         approvalPath: { type: string }
+    RequestStatusInput:
+      type: object
+      required: [status]
+      properties:
+        status: { type: string, enum: [Pending review, Approved, Rejected, Needs information, Paid] }
+        note: { type: string }
+    EvidenceUploadInput:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name: { type: string }
+        size: { type: number, minimum: 1 }
+        contentType: { type: string }
+    EvidenceUpload:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL: { type: string }
+        objectPath: { type: string }
+        metadata: { type: object, additionalProperties: true }
     ShiftRule:
       type: object
       required: [id, name, startTime, endTime]
@@ -1014,6 +1542,15 @@ components:
           items: { $ref: "#/components/schemas/ShiftRule" }
         geofenceRadiusMeters: { type: number, minimum: 1 }
         geofenceRequireInside: { type: boolean }
+        siteLatitude: { type: number }
+        siteLongitude: { type: number }
+        city: { type: string }
+        cityLatitude: { type: number }
+        cityLongitude: { type: number }
+        cityRadiusMeters: { type: number }
+        attendanceGraceMinutes: { type: number }
+        maxLocationAccuracyMeters: { type: number }
+        offlineAttendanceEnabled: { type: boolean }
         tracking:
           $ref: "#/components/schemas/TrackingRule"
         checklist:
@@ -1061,6 +1598,15 @@ components:
           items: { $ref: "#/components/schemas/ShiftRule" }
         geofenceRadiusMeters: { type: number, minimum: 1, maximum: 10000 }
         geofenceRequireInside: { type: boolean }
+        siteLatitude: { type: number }
+        siteLongitude: { type: number }
+        city: { type: string }
+        cityLatitude: { type: number }
+        cityLongitude: { type: number }
+        cityRadiusMeters: { type: number }
+        attendanceGraceMinutes: { type: number }
+        maxLocationAccuracyMeters: { type: number }
+        offlineAttendanceEnabled: { type: boolean }
         tracking:
           $ref: "#/components/schemas/TrackingRule"
         checklist:

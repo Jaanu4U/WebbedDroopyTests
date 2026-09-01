@@ -114,6 +114,14 @@ export interface AttendanceRecord {
   /** @nullable */
   punchOut: string | null;
   geofence: string;
+  /** @nullable */
+  punchInVerification: string | null;
+  /** @nullable */
+  punchOutVerification: string | null;
+  /** @nullable */
+  punchInAccuracyMeters?: number | null;
+  /** @nullable */
+  punchOutAccuracyMeters?: number | null;
   siteAddress: string;
   geofenceRadiusMeters: number;
   shiftWindow: string;
@@ -127,10 +135,64 @@ export const AttendancePunchInputAction = {
   out: 'out',
 } as const;
 
+export type AttendancePunchInputSource = typeof AttendancePunchInputSource[keyof typeof AttendancePunchInputSource];
+
+
+export const AttendancePunchInputSource = {
+  online: 'online',
+  offline: 'offline',
+  supervisor: 'supervisor',
+} as const;
+
 export interface AttendancePunchInput {
   action: AttendancePunchInputAction;
   location: string;
   geofenceVerified?: boolean;
+  /**
+     * @minimum -90
+     * @maximum 90
+     */
+  latitude?: number;
+  /**
+     * @minimum -180
+     * @maximum 180
+     */
+  longitude?: number;
+  /** @minimum 0 */
+  accuracyMeters?: number;
+  capturedAt?: string;
+  source?: AttendancePunchInputSource;
+  /** @minLength 8 */
+  idempotencyKey?: string;
+}
+
+export type AttendanceCorrectionInputAction = typeof AttendanceCorrectionInputAction[keyof typeof AttendanceCorrectionInputAction];
+
+
+export const AttendanceCorrectionInputAction = {
+  in: 'in',
+  out: 'out',
+} as const;
+
+export type AttendanceCorrectionInputEvidence = { [key: string]: unknown };
+
+export interface AttendanceCorrectionInput {
+  attendanceId: string;
+  action: AttendanceCorrectionInputAction;
+  correctedAt?: string;
+  /** @minLength 5 */
+  reason: string;
+  evidence?: AttendanceCorrectionInputEvidence;
+}
+
+export interface AttendanceCorrection {
+  id: string;
+  attendanceId: string;
+  action: string;
+  status: string;
+  reason: string;
+  requestedBy: string;
+  requestedAt: string;
 }
 
 export interface SosInput {
@@ -148,6 +210,24 @@ export interface SosAlert {
   triggeredBy: string;
   acknowledgementWindowMinutes: number;
   acknowledgementDueAt: string;
+}
+
+export type SosStatusInputStatus = typeof SosStatusInputStatus[keyof typeof SosStatusInputStatus];
+
+
+export const SosStatusInputStatus = {
+  Triggered: 'Triggered',
+  Delivered: 'Delivered',
+  Acknowledged: 'Acknowledged',
+  Dispatched: 'Dispatched',
+  Safe: 'Safe',
+  Escalated: 'Escalated',
+  Closed: 'Closed',
+} as const;
+
+export interface SosStatusInput {
+  status: SosStatusInputStatus;
+  note?: string;
 }
 
 export interface Guard {
@@ -205,6 +285,255 @@ export interface FieldOfficerLocation {
   trackingWindow: string;
   heartbeatMinutes: number;
   coordinates: FieldOfficerLocationCoordinates;
+  /** @nullable */
+  latitude: number | null;
+  /** @nullable */
+  longitude: number | null;
+  /** @nullable */
+  accuracyMeters: number | null;
+  stale: boolean;
+}
+
+export interface LocationHeartbeatInput {
+  employeeId?: string;
+  /** @minLength 1 */
+  employeeName: string;
+  /** @minLength 1 */
+  city: string;
+  site?: string;
+  dutyStatus: string;
+  /**
+     * @minimum -90
+     * @maximum 90
+     */
+  latitude: number;
+  /**
+     * @minimum -180
+     * @maximum 180
+     */
+  longitude: number;
+  /** @minimum 0 */
+  accuracyMeters?: number;
+  capturedAt: string;
+  source?: string;
+  deviceId?: string;
+}
+
+export interface LocationHeartbeat {
+  id: string;
+  /** @nullable */
+  employeeId?: string | null;
+  employeeName: string;
+  city: string;
+  /** @nullable */
+  site?: string | null;
+  dutyStatus: string;
+  latitude: number;
+  longitude: number;
+  /** @nullable */
+  accuracyMeters?: number | null;
+  capturedAt: string;
+  receivedAt: string;
+  stale: boolean;
+}
+
+export interface PatrolCheckpointInput {
+  /** @minLength 1 */
+  site: string;
+  /** @minLength 1 */
+  name: string;
+  /** @minLength 4 */
+  qrToken: string;
+  /** @minimum 1 */
+  sequence: number;
+  latitude?: number;
+  longitude?: number;
+  /** @minimum 1 */
+  radiusMeters?: number;
+}
+
+export interface PatrolCheckpoint {
+  id: string;
+  site: string;
+  name: string;
+  qrToken: string;
+  sequence: number;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  radiusMeters: number;
+  active: boolean;
+}
+
+export type PatrolScanInputEvidence = { [key: string]: unknown };
+
+export interface PatrolScanInput {
+  /** @minLength 4 */
+  checkpointToken: string;
+  /** @minLength 1 */
+  roundId: string;
+  latitude?: number;
+  longitude?: number;
+  accuracyMeters?: number;
+  note?: string;
+  evidence?: PatrolScanInputEvidence;
+}
+
+export interface PatrolScan {
+  id: string;
+  checkpointId: string;
+  roundId: string;
+  scannedBy: string;
+  scannedAt: string;
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  /** @nullable */
+  accuracyMeters?: number | null;
+  status: string;
+  /** @nullable */
+  note?: string | null;
+}
+
+export interface PatrolSummary {
+  rounds: number;
+  completed: number;
+  missed: number;
+  completionPercent: number;
+}
+
+export type IncidentInputSeverity = typeof IncidentInputSeverity[keyof typeof IncidentInputSeverity];
+
+
+export const IncidentInputSeverity = {
+  Low: 'Low',
+  Medium: 'Medium',
+  High: 'High',
+  Critical: 'Critical',
+} as const;
+
+export interface IncidentInput {
+  category: string;
+  severity: IncidentInputSeverity;
+  /** @minLength 1 */
+  title: string;
+  /** @minLength 1 */
+  narrative: string;
+  site?: string;
+  affectedPeople?: string[];
+  affectedAssets?: string[];
+  latitude?: number;
+  longitude?: number;
+  dueAt?: string;
+}
+
+export interface Incident {
+  id: string;
+  category: string;
+  severity: string;
+  status: string;
+  title: string;
+  narrative: string;
+  /** @nullable */
+  site?: string | null;
+  affectedPeople?: string[];
+  affectedAssets?: string[];
+  /** @nullable */
+  latitude?: number | null;
+  /** @nullable */
+  longitude?: number | null;
+  reportedAt: string;
+  /** @nullable */
+  dueAt?: string | null;
+  /** @nullable */
+  assignedTo?: string | null;
+  createdBy: string;
+}
+
+export type IncidentStatusInputStatus = typeof IncidentStatusInputStatus[keyof typeof IncidentStatusInputStatus];
+
+
+export const IncidentStatusInputStatus = {
+  Submitted: 'Submitted',
+  Acknowledged: 'Acknowledged',
+  Assigned: 'Assigned',
+  In_Progress: 'In Progress',
+  Contained: 'Contained',
+  Closed: 'Closed',
+  Reopened: 'Reopened',
+} as const;
+
+export interface IncidentStatusInput {
+  status: IncidentStatusInputStatus;
+  note?: string;
+}
+
+export interface RosterAssignmentInput {
+  employeeId: string;
+  employeeName: string;
+  site: string;
+  post: string;
+  shift: string;
+  rosterDate?: string;
+  replacementFor?: string;
+}
+
+export interface RosterAssignment {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  site: string;
+  post: string;
+  shift: string;
+  rosterDate: string;
+  status: string;
+  /** @nullable */
+  acknowledgedAt?: string | null;
+  /** @nullable */
+  replacementFor?: string | null;
+  /** @nullable */
+  lockedAt?: string | null;
+  /** @nullable */
+  conflictReason?: string | null;
+}
+
+export interface ComplianceRecord {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  kind: string;
+  /** @nullable */
+  reference?: string | null;
+  status: string;
+  /** @nullable */
+  expiresAt?: string | null;
+  /** @nullable */
+  verifiedAt?: string | null;
+}
+
+export type OperationalReportInputData = { [key: string]: unknown };
+
+export interface OperationalReportInput {
+  site: string;
+  data: OperationalReportInputData;
+}
+
+export type OperationalReportData = { [key: string]: unknown };
+
+export interface OperationalReport {
+  id: string;
+  reportDate: string;
+  site: string;
+  status: string;
+  /** @nullable */
+  submittedBy?: string | null;
+  /** @nullable */
+  approvedBy?: string | null;
+  /** @nullable */
+  approvedAt?: string | null;
+  data: OperationalReportData;
 }
 
 export interface EmployeeSubmission {
@@ -262,6 +591,37 @@ export interface RequestRecord {
   status: string;
   submittedBy: string;
   approvalPath: string;
+}
+
+export type RequestStatusInputStatus = typeof RequestStatusInputStatus[keyof typeof RequestStatusInputStatus];
+
+
+export const RequestStatusInputStatus = {
+  Pending_review: 'Pending review',
+  Approved: 'Approved',
+  Rejected: 'Rejected',
+  Needs_information: 'Needs information',
+  Paid: 'Paid',
+} as const;
+
+export interface RequestStatusInput {
+  status: RequestStatusInputStatus;
+  note?: string;
+}
+
+export interface EvidenceUploadInput {
+  name: string;
+  /** @minimum 1 */
+  size: number;
+  contentType: string;
+}
+
+export type EvidenceUploadMetadata = { [key: string]: unknown };
+
+export interface EvidenceUpload {
+  uploadURL: string;
+  objectPath: string;
+  metadata?: EvidenceUploadMetadata;
 }
 
 export interface ShiftRule {
@@ -417,6 +777,15 @@ export interface OperatingPolicy {
   /** @minimum 1 */
   geofenceRadiusMeters: number;
   geofenceRequireInside: boolean;
+  siteLatitude?: number;
+  siteLongitude?: number;
+  city?: string;
+  cityLatitude?: number;
+  cityLongitude?: number;
+  cityRadiusMeters?: number;
+  attendanceGraceMinutes?: number;
+  maxLocationAccuracyMeters?: number;
+  offlineAttendanceEnabled?: boolean;
   tracking: TrackingRule;
   checklist: ChecklistRule[];
   /** @minimum 1 */
@@ -468,6 +837,15 @@ export interface OperatingPolicyUpdate {
      */
   geofenceRadiusMeters: number;
   geofenceRequireInside: boolean;
+  siteLatitude?: number;
+  siteLongitude?: number;
+  city?: string;
+  cityLatitude?: number;
+  cityLongitude?: number;
+  cityRadiusMeters?: number;
+  attendanceGraceMinutes?: number;
+  maxLocationAccuracyMeters?: number;
+  offlineAttendanceEnabled?: boolean;
   tracking: TrackingRule;
   checklist: ChecklistRule[];
   /**

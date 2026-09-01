@@ -22,6 +22,15 @@ export interface OperatingPolicy {
   /** @minimum 1 */
   geofenceRadiusMeters: number;
   geofenceRequireInside: boolean;
+  siteLatitude?: number;
+  siteLongitude?: number;
+  city?: string;
+  cityLatitude?: number;
+  cityLongitude?: number;
+  cityRadiusMeters?: number;
+  attendanceGraceMinutes?: number;
+  maxLocationAccuracyMeters?: number;
+  offlineAttendanceEnabled?: boolean;
   tracking: TrackingRule;
   checklist: ChecklistRule[];
   /** @minimum 1 */

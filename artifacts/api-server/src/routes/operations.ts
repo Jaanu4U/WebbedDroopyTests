@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type IRouter, type Request, type Response } from "express";
 import { clerkClient } from "@clerk/express";
-import { asc, desc, and, eq, notInArray, or } from "drizzle-orm";
+import { asc, desc, and, eq, notInArray, or, sql } from "drizzle-orm";
 import {
   db,
   attendanceRecordsTable,
@@ -14,6 +14,15 @@ import {
   operatingPoliciesTable,
   operatingPolicyRevisionsTable,
   workforceItemsTable,
+  attendanceEventsTable,
+  locationHeartbeatsTable,
+  patrolCheckpointsTable,
+  patrolScansTable,
+  incidentRecordsTable,
+  incidentEventsTable,
+  rosterAssignmentsTable,
+  complianceRecordsTable,
+  operationalReportsTable,
 } from "@workspace/db";
 import {
   PunchAttendanceBody,
@@ -94,6 +103,15 @@ type PolicyInput = {
   shifts: ShiftRule[];
   geofenceRadiusMeters: number;
   geofenceRequireInside: boolean;
+  siteLatitude: number;
+  siteLongitude: number;
+  city: string;
+  cityLatitude: number;
+  cityLongitude: number;
+  cityRadiusMeters: number;
+  attendanceGraceMinutes: number;
+  maxLocationAccuracyMeters: number;
+  offlineAttendanceEnabled: boolean;
   tracking: {
     enabled: boolean;
     startTime: string;
@@ -131,6 +149,15 @@ const defaultPolicy: PolicyInput = {
   ],
   geofenceRadiusMeters: 150,
   geofenceRequireInside: true,
+  siteLatitude: 12.9716,
+  siteLongitude: 77.7500,
+  city: "Bengaluru",
+  cityLatitude: 12.9716,
+  cityLongitude: 77.5946,
+  cityRadiusMeters: 50000,
+  attendanceGraceMinutes: 15,
+  maxLocationAccuracyMeters: 100,
+  offlineAttendanceEnabled: true,
   tracking: {
     enabled: true,
     startTime: "06:00",
@@ -172,6 +199,15 @@ function policyResponse(record: typeof operatingPoliciesTable.$inferSelect) {
     shifts: record.shifts as ShiftRule[],
     geofenceRadiusMeters: record.geofenceRadiusMeters,
     geofenceRequireInside: record.geofenceRequireInside,
+    siteLatitude: record.siteLatitude,
+    siteLongitude: record.siteLongitude,
+    city: record.city,
+    cityLatitude: record.cityLatitude,
+    cityLongitude: record.cityLongitude,
+    cityRadiusMeters: record.cityRadiusMeters,
+    attendanceGraceMinutes: record.attendanceGraceMinutes,
+    maxLocationAccuracyMeters: record.maxLocationAccuracyMeters,
+    offlineAttendanceEnabled: record.offlineAttendanceEnabled,
     tracking: {
       enabled: record.trackingEnabled,
       startTime: record.trackingStartTime,
@@ -209,6 +245,15 @@ function policyInputFromRecord(record: typeof operatingPoliciesTable.$inferSelec
     shifts: response.shifts,
     geofenceRadiusMeters: response.geofenceRadiusMeters,
     geofenceRequireInside: response.geofenceRequireInside,
+    siteLatitude: response.siteLatitude,
+    siteLongitude: response.siteLongitude,
+    city: response.city,
+    cityLatitude: response.cityLatitude,
+    cityLongitude: response.cityLongitude,
+    cityRadiusMeters: response.cityRadiusMeters,
+    attendanceGraceMinutes: response.attendanceGraceMinutes,
+    maxLocationAccuracyMeters: response.maxLocationAccuracyMeters,
+    offlineAttendanceEnabled: response.offlineAttendanceEnabled,
     tracking: response.tracking,
     checklist: response.checklist,
     sosAcknowledgementMinutes: response.sosAcknowledgementMinutes,
@@ -229,6 +274,15 @@ function policySectionSnapshots(policy: PolicyInput): PolicySectionSnapshot {
     attendance: {
       geofenceRadiusMeters: policy.geofenceRadiusMeters,
       geofenceRequireInside: policy.geofenceRequireInside,
+      siteLatitude: policy.siteLatitude,
+      siteLongitude: policy.siteLongitude,
+      city: policy.city,
+      cityLatitude: policy.cityLatitude,
+      cityLongitude: policy.cityLongitude,
+      cityRadiusMeters: policy.cityRadiusMeters,
+      attendanceGraceMinutes: policy.attendanceGraceMinutes,
+      maxLocationAccuracyMeters: policy.maxLocationAccuracyMeters,
+      offlineAttendanceEnabled: policy.offlineAttendanceEnabled,
     },
     tracking: policy.tracking,
     checklist: policy.checklist,
@@ -258,7 +312,19 @@ function changedPolicySections(
 ): string[] {
   const previous = policyInputFromRecord(existing);
   const previousSnapshots = policySectionSnapshots(previous);
-  const nextSnapshots = policySectionSnapshots(next);
+  const nextSnapshots = policySectionSnapshots({
+    ...defaultPolicy,
+    ...next,
+    siteLatitude: next.siteLatitude ?? previous.siteLatitude,
+    siteLongitude: next.siteLongitude ?? previous.siteLongitude,
+    city: next.city ?? previous.city,
+    cityLatitude: next.cityLatitude ?? previous.cityLatitude,
+    cityLongitude: next.cityLongitude ?? previous.cityLongitude,
+    cityRadiusMeters: next.cityRadiusMeters ?? previous.cityRadiusMeters,
+    attendanceGraceMinutes: next.attendanceGraceMinutes ?? previous.attendanceGraceMinutes,
+    maxLocationAccuracyMeters: next.maxLocationAccuracyMeters ?? previous.maxLocationAccuracyMeters,
+    offlineAttendanceEnabled: next.offlineAttendanceEnabled ?? previous.offlineAttendanceEnabled,
+  });
 
   return Object.keys(previousSnapshots)
     .filter((section) =>
@@ -577,6 +643,10 @@ function attendanceResponse(
     punchIn: timeValue(record.punchInAt),
     punchOut: timeValue(record.punchOutAt),
     geofence: record.geofence,
+    punchInVerification: record.punchInVerification,
+    punchOutVerification: record.punchOutVerification,
+    punchInAccuracyMeters: record.punchInAccuracyMeters,
+    punchOutAccuracyMeters: record.punchOutAccuracyMeters,
     siteAddress: policy.siteAddress,
     geofenceRadiusMeters: policy.geofenceRadiusMeters,
     shiftWindow: shift ? `${shift.startTime}–${shift.endTime}` : "Configured shift window",
@@ -644,6 +714,132 @@ function sosResponse(record: typeof sosAlertsTable.$inferSelect, policy: PolicyI
   };
 }
 
+function haversineMeters(
+  latitude: number,
+  longitude: number,
+  targetLatitude: number,
+  targetLongitude: number,
+) {
+  const radius = 6_371_000;
+  const latDelta = (targetLatitude - latitude) * Math.PI / 180;
+  const lngDelta = (targetLongitude - longitude) * Math.PI / 180;
+  const lat1 = latitude * Math.PI / 180;
+  const lat2 = targetLatitude * Math.PI / 180;
+  const value = Math.sin(latDelta / 2) ** 2
+    + Math.sin(lngDelta / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return radius * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
+function heartbeatResponse(record: typeof locationHeartbeatsTable.$inferSelect, policy: PolicyInput) {
+  const stale = Date.now() - record.capturedAt.getTime() > policy.tracking.offlineAfterMinutes * 60_000;
+  return {
+    id: record.id,
+    employeeId: record.employeeId,
+    employeeName: record.employeeName,
+    city: record.city,
+    site: record.site,
+    dutyStatus: stale ? "Offline" : record.dutyStatus,
+    latitude: record.latitude,
+    longitude: record.longitude,
+    accuracyMeters: record.accuracyMeters,
+    capturedAt: record.capturedAt.toISOString(),
+    receivedAt: record.receivedAt.toISOString(),
+    stale,
+  };
+}
+
+function checkpointResponse(record: typeof patrolCheckpointsTable.$inferSelect) {
+  return {
+    id: record.id,
+    site: record.site,
+    name: record.name,
+    qrToken: record.qrToken,
+    sequence: record.sequence,
+    latitude: record.latitude,
+    longitude: record.longitude,
+    radiusMeters: record.radiusMeters,
+    active: record.active,
+  };
+}
+
+function patrolScanResponse(record: typeof patrolScansTable.$inferSelect) {
+  return {
+    id: record.id,
+    checkpointId: record.checkpointId,
+    roundId: record.roundId,
+    scannedBy: record.scannedBy,
+    scannedAt: record.scannedAt.toISOString(),
+    latitude: record.latitude,
+    longitude: record.longitude,
+    accuracyMeters: record.accuracyMeters,
+    status: record.status,
+    note: record.note,
+  };
+}
+
+function incidentResponse(record: typeof incidentRecordsTable.$inferSelect) {
+  return {
+    id: record.id,
+    category: record.category,
+    severity: record.severity,
+    status: record.status,
+    title: record.title,
+    narrative: record.narrative,
+    site: record.site,
+    affectedPeople: record.affectedPeople,
+    affectedAssets: record.affectedAssets,
+    latitude: record.latitude,
+    longitude: record.longitude,
+    reportedAt: record.reportedAt.toISOString(),
+    dueAt: record.dueAt?.toISOString() ?? null,
+    assignedTo: record.assignedTo,
+    createdBy: record.createdBy,
+  };
+}
+
+function rosterResponse(record: typeof rosterAssignmentsTable.$inferSelect) {
+  return {
+    id: record.id,
+    employeeId: record.employeeId,
+    employeeName: record.employeeName,
+    site: record.site,
+    post: record.post,
+    shift: record.shift,
+    rosterDate: record.rosterDate,
+    status: record.status,
+    acknowledgedAt: record.acknowledgedAt?.toISOString() ?? null,
+    replacementFor: record.replacementFor,
+    lockedAt: record.lockedAt?.toISOString() ?? null,
+    conflictReason: record.conflictReason,
+  };
+}
+
+function complianceResponse(record: typeof complianceRecordsTable.$inferSelect) {
+  return {
+    id: record.id,
+    employeeId: record.employeeId,
+    employeeName: record.employeeName,
+    kind: record.kind,
+    reference: record.reference,
+    status: record.status,
+    expiresAt: record.expiresAt?.toISOString() ?? null,
+    verifiedAt: record.verifiedAt?.toISOString() ?? null,
+  };
+}
+
+function reportResponse(record: typeof operationalReportsTable.$inferSelect) {
+  return {
+    id: record.id,
+    reportDate: record.reportDate,
+    site: record.site,
+    status: record.status,
+    submittedBy: record.submittedBy,
+    approvedBy: record.approvedBy,
+    approvedAt: record.approvedAt?.toISOString() ?? null,
+    data: record.data,
+  };
+}
+
 function requestResponse(record: typeof requestsTable.$inferSelect, policy: PolicyInput) {
   const approvalPath =
     record.type === "Leave request" ? policy.approvals.leave.join(" → ") :
@@ -672,6 +868,15 @@ async function seedOperationalData() {
       shifts: defaultPolicy.shifts,
       geofenceRadiusMeters: defaultPolicy.geofenceRadiusMeters,
       geofenceRequireInside: defaultPolicy.geofenceRequireInside,
+      siteLatitude: defaultPolicy.siteLatitude,
+      siteLongitude: defaultPolicy.siteLongitude,
+      city: defaultPolicy.city,
+      cityLatitude: defaultPolicy.cityLatitude,
+      cityLongitude: defaultPolicy.cityLongitude,
+      cityRadiusMeters: defaultPolicy.cityRadiusMeters,
+      attendanceGraceMinutes: defaultPolicy.attendanceGraceMinutes,
+      maxLocationAccuracyMeters: defaultPolicy.maxLocationAccuracyMeters,
+      offlineAttendanceEnabled: defaultPolicy.offlineAttendanceEnabled,
       trackingEnabled: defaultPolicy.tracking.enabled,
       trackingStartTime: defaultPolicy.tracking.startTime,
       trackingEndTime: defaultPolicy.tracking.endTime,
@@ -713,6 +918,23 @@ async function seedOperationalData() {
     { id: "g-004", name: "Sanjay Rao", role: "Security Guard", post: "Parking P2", shift: "Morning", status: "Not checked in", lastSeenAt: null },
     { id: "g-005", name: "Devendra Yadav", role: "Security Guard", post: "East Perimeter", shift: "Morning", status: "On duty", lastSeenAt: new Date(currentTime - 8 * 60_000) },
     { id: "g-006", name: "Karan Joshi", role: "Security Guard", post: "Server Wing", shift: "Morning", status: "On duty", lastSeenAt: new Date(currentTime - 12 * 60_000) },
+  ]).onConflictDoNothing();
+
+  await db.insert(locationHeartbeatsTable).values([
+    {
+      id: "heartbeat-fo-001",
+      employeeId: "fo-001",
+      employeeName: "Rahul Verma",
+      role: "Field Officer",
+      city: policy.city,
+      site: policy.siteName,
+      dutyStatus: "On duty",
+      latitude: policy.cityLatitude,
+      longitude: policy.cityLongitude,
+      accuracyMeters: 12,
+      capturedAt: new Date(currentTime - 2 * 60_000),
+      source: "seeded-operational-record",
+    },
   ]).onConflictDoNothing();
 
   await db.insert(checklistItemsTable).values(policy.checklist.map((item, index) => ({
@@ -1159,7 +1381,19 @@ router.patch("/policies/operating", requireRole("Management"), async (req, res) 
 
     const changedSections = changedPolicySections(existing, body);
     const previousSnapshots = policySectionSnapshots(policyInputFromRecord(existing));
-    const nextSnapshots = policySectionSnapshots(body);
+    const nextSnapshots = policySectionSnapshots({
+      ...defaultPolicy,
+      ...body,
+      siteLatitude: body.siteLatitude ?? existing.siteLatitude,
+      siteLongitude: body.siteLongitude ?? existing.siteLongitude,
+      city: body.city ?? existing.city,
+      cityLatitude: body.cityLatitude ?? existing.cityLatitude,
+      cityLongitude: body.cityLongitude ?? existing.cityLongitude,
+      cityRadiusMeters: body.cityRadiusMeters ?? existing.cityRadiusMeters,
+      attendanceGraceMinutes: body.attendanceGraceMinutes ?? existing.attendanceGraceMinutes,
+      maxLocationAccuracyMeters: body.maxLocationAccuracyMeters ?? existing.maxLocationAccuracyMeters,
+      offlineAttendanceEnabled: body.offlineAttendanceEnabled ?? existing.offlineAttendanceEnabled,
+    });
     const actor = operatorFor(req);
     const [updatedPolicy] = await tx.update(operatingPoliciesTable).set({
       siteName: body.siteName,
@@ -1275,12 +1509,53 @@ router.patch("/policies/operating", requireRole("Management"), async (req, res) 
   res.json(policyResponse(updated));
 });
 
-router.get("/dashboard/summary", (_req, res) => {
-  res.json({ coverage: 92, attendance: 88, patrol: 96, incidents: 2, openApprovals: 7, fieldOfficers: 12 });
+router.get("/dashboard/summary", async (_req, res) => {
+  const [guards, attendance, scans, incidents, items, heartbeats] = await Promise.all([
+    db.select().from(guardsTable),
+    db.select().from(attendanceRecordsTable).where(eq(attendanceRecordsTable.attendanceDate, todayKey())),
+    db.select().from(patrolScansTable),
+    db.select().from(incidentRecordsTable),
+    db.select().from(workforceItemsTable),
+    db.select().from(locationHeartbeatsTable).orderBy(desc(locationHeartbeatsTable.capturedAt)),
+  ]);
+  const latestOfficers = new Map<string, typeof heartbeats[number]>();
+  for (const heartbeat of heartbeats) {
+    const key = heartbeat.employeeId ?? heartbeat.employeeName;
+    if (!latestOfficers.has(key)) latestOfficers.set(key, heartbeat);
+  }
+  const presentGuards = guards.filter((guard) => ["On duty", "Present", "Checked in"].includes(guard.status)).length;
+  const attendancePercent = attendance.length === 0
+    ? 0
+    : Math.round(attendance.filter((record) => record.status !== "Absent").length / attendance.length * 100);
+  const patrolPercent = scans.length === 0
+    ? 0
+    : Math.round(scans.filter((scan) => scan.status === "Verified").length / scans.length * 100);
+  const activeIncidents = incidents.filter((incident) => !["Closed"].includes(incident.status)).length;
+  const openApprovals = items.filter((item) => /pending|review|approval/i.test(item.status)).length;
+  const liveOfficers = [...latestOfficers.values()].filter((heartbeat) =>
+    Date.now() - heartbeat.capturedAt.getTime() <= 15 * 60_000,
+  ).length;
+  res.json({
+    coverage: guards.length ? Math.round(presentGuards / guards.length * 100) : 0,
+    attendance: attendancePercent,
+    patrol: patrolPercent,
+    incidents: activeIncidents,
+    openApprovals,
+    fieldOfficers: liveOfficers,
+  });
 });
 
-router.get("/activity", (_req, res) => {
-  res.json(activities);
+router.get("/activity", async (_req, res) => {
+  const events = await db.select().from(auditEventsTable)
+    .orderBy(desc(auditEventsTable.createdAt))
+    .limit(20);
+  res.json(events.map((event) => ({
+    id: event.id,
+    title: event.action,
+    detail: event.summary,
+    time: lastSeenValue(event.createdAt),
+    tone: /reject|outside|late|sos|incident/i.test(event.action) ? "danger" : /pending|review/i.test(event.action) ? "warning" : "info",
+  })));
 });
 
 router.get("/attendance/today", async (req, res) => {
@@ -1296,11 +1571,19 @@ router.get("/attendance/today", async (req, res) => {
 
 router.post("/attendance/punch", async (req, res) => {
   const body = PunchAttendanceBody.parse(req.body);
+  const idempotencyKey = body.idempotencyKey ?? `legacy-${randomUUID()}`;
   const [policyRecord] = await db.select().from(operatingPoliciesTable).limit(1);
   const policy = policyRecord ? policyInputFromRecord(policyRecord) : defaultPolicy;
-  if (policy.geofenceRequireInside && body.geofenceVerified !== true) {
-    res.status(422).json({ error: `Attendance can only be recorded inside the ${policy.geofenceRadiusMeters}m site geofence.` });
-    return;
+  const [existingEvent] = await db.select().from(attendanceEventsTable)
+    .where(eq(attendanceEventsTable.idempotencyKey, idempotencyKey))
+    .limit(1);
+  if (existingEvent) {
+    const [existingRecord] = await db.select().from(attendanceRecordsTable)
+      .where(eq(attendanceRecordsTable.id, existingEvent.attendanceId));
+    if (existingRecord) {
+      res.json(attendanceResponse(existingRecord, policy, req.workforceAccess));
+      return;
+    }
   }
   const attendanceDate = todayKey();
   const [record] = await db.select().from(attendanceRecordsTable)
@@ -1310,6 +1593,49 @@ router.post("/attendance/punch", async (req, res) => {
     return;
   }
   const timestamp = now();
+  const capturedAt = body.capturedAt ? new Date(body.capturedAt) : timestamp;
+  const hasCoordinates = typeof body.latitude === "number" && typeof body.longitude === "number";
+  const distance = hasCoordinates
+    ? haversineMeters(body.latitude!, body.longitude!, policy.siteLatitude, policy.siteLongitude)
+    : null;
+  const accuracyTooLow = typeof body.accuracyMeters === "number"
+    && body.accuracyMeters > policy.maxLocationAccuracyMeters;
+  const staleCapture = timestamp.getTime() - capturedAt.getTime() > 24 * 60 * 60_000
+    || capturedAt.getTime() - timestamp.getTime() > 5 * 60_000;
+  const insideGeofence = distance !== null && distance <= policy.geofenceRadiusMeters;
+  const supervisorOverride = body.source === "supervisor";
+  const verified = supervisorOverride || (
+    hasCoordinates && insideGeofence && !accuracyTooLow && !staleCapture
+  );
+  if (policy.geofenceRequireInside && !verified) {
+    const reason = !hasCoordinates
+      ? `A live latitude and longitude are required before checking the ${policy.geofenceRadiusMeters}m site geofence.`
+      : accuracyTooLow
+        ? `Location accuracy must be ${policy.maxLocationAccuracyMeters}m or better.`
+        : staleCapture
+          ? "The captured location is stale and must be recorded again."
+          : `Attendance can only be recorded inside the ${policy.geofenceRadiusMeters}m site geofence.`;
+    await db.insert(attendanceEventsTable).values({
+      id: `attendance-event-${randomUUID()}`,
+      attendanceId: record.id,
+      employeeId: req.workforceAccess?.fieldOfficerId ?? req.workforceAccess?.userId ?? null,
+      employeeName: record.employeeName,
+      action: body.action,
+      status: "Rejected",
+      latitude: body.latitude ?? null,
+      longitude: body.longitude ?? null,
+      accuracyMeters: body.accuracyMeters ?? null,
+      capturedAt,
+      source: body.source ?? "online",
+      idempotencyKey,
+      distanceFromSiteMeters: distance,
+      verification: "outside_geofence",
+      reason,
+      actor: operatorFor(req),
+    });
+    res.status(422).json({ error: reason, distanceFromSiteMeters: distance, verification: "Rejected" });
+    return;
+  }
   const activeShift = policy.shifts.find((shift) => {
     const minutes = timestampMinutes(timestamp);
     const start = timestampMinutesFromString(shift.startTime);
@@ -1319,16 +1645,54 @@ router.post("/attendance/punch", async (req, res) => {
   const [updated] = await db.update(attendanceRecordsTable)
     .set({
       ...(body.action === "in"
-        ? { punchInAt: timestamp, status: "On duty", shift: activeShift ? `${activeShift.name} · ${activeShift.startTime}–${activeShift.endTime}` : record.shift }
-        : { punchOutAt: timestamp, status: "Shift complete" }),
+        ? {
+            punchInAt: timestamp,
+            punchInLatitude: body.latitude ?? null,
+            punchInLongitude: body.longitude ?? null,
+            punchInAccuracyMeters: body.accuracyMeters ?? null,
+            punchInCapturedAt: capturedAt,
+            punchInReceivedAt: timestamp,
+            punchInSource: body.source ?? "online",
+            punchInVerification: verified ? "Verified" : "Manual override",
+            status: "On duty",
+            shift: activeShift ? `${activeShift.name} · ${activeShift.startTime}–${activeShift.endTime}` : record.shift,
+          }
+        : {
+            punchOutAt: timestamp,
+            punchOutLatitude: body.latitude ?? null,
+            punchOutLongitude: body.longitude ?? null,
+            punchOutAccuracyMeters: body.accuracyMeters ?? null,
+            punchOutCapturedAt: capturedAt,
+            punchOutReceivedAt: timestamp,
+            punchOutSource: body.source ?? "online",
+            punchOutVerification: verified ? "Verified" : "Manual override",
+            status: "Shift complete",
+          }),
       site: policy.siteName,
       geofence: policy.geofenceRequireInside
-        ? `Inside ${policy.siteName} geofence (${policy.geofenceRadiusMeters}m)`
+        ? `${verified ? "Inside" : "Manual override"} ${policy.siteName} geofence (${policy.geofenceRadiusMeters}m)${distance === null ? "" : ` · ${Math.round(distance)}m from site`}`
         : body.location,
       updatedAt: timestamp,
     })
     .where(eq(attendanceRecordsTable.id, record.id))
     .returning();
+  await db.insert(attendanceEventsTable).values({
+    id: `attendance-event-${randomUUID()}`,
+    attendanceId: record.id,
+    employeeId: req.workforceAccess?.fieldOfficerId ?? req.workforceAccess?.userId ?? null,
+    employeeName: record.employeeName,
+    action: body.action,
+    status: "Accepted",
+    latitude: body.latitude ?? null,
+    longitude: body.longitude ?? null,
+    accuracyMeters: body.accuracyMeters ?? null,
+    capturedAt,
+    source: body.source ?? "online",
+    idempotencyKey,
+    distanceFromSiteMeters: distance,
+    verification: verified ? "Verified" : "Manual override",
+    actor: operatorFor(req),
+  });
   res.json(attendanceResponse(updated, policy, req.workforceAccess));
 });
 
@@ -1355,6 +1719,78 @@ router.post("/emergency/sos", async (req, res) => {
     triggeredBy: operatorFor(req),
   }).returning();
   res.status(201).json(sosResponse(alert, policy));
+});
+
+router.patch("/emergency/sos/:id/status", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const status = (req.body as { status?: string }).status;
+  const allowed = ["Triggered", "Delivered", "Acknowledged", "Dispatched", "Safe", "Escalated", "Closed"];
+  if (!status || !allowed.includes(status)) {
+    res.status(400).json({ error: "Invalid SOS lifecycle status" });
+    return;
+  }
+  const [policyRecord] = await db.select().from(operatingPoliciesTable).limit(1);
+  const policy = policyRecord ? policyInputFromRecord(policyRecord) : defaultPolicy;
+  const [alert] = await db.update(sosAlertsTable).set({ status })
+    .where(eq(sosAlertsTable.id, String(req.params.id))).returning();
+  if (!alert) {
+    res.status(404).json({ error: "SOS alert not found" });
+    return;
+  }
+  await db.insert(auditEventsTable).values({
+    id: randomUUID(),
+    entityType: "sos",
+    entityId: alert.id,
+    action: `sos_${status.toLowerCase()}`,
+    actorId: operatorFor(req),
+    summary: `SOS transitioned to ${status}`,
+    metadata: { note: (req.body as { note?: string }).note ?? null },
+  });
+  res.json(sosResponse(alert, policy));
+});
+
+router.post("/attendance/corrections", requireRole("Guard", "Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const body = req.body as {
+    attendanceId?: string; action?: string; correctedAt?: string; reason?: string; evidence?: Record<string, unknown>;
+  };
+  if (!body.attendanceId || !["in", "out"].includes(body.action ?? "") || !body.reason || body.reason.trim().length < 5) {
+    res.status(400).json({ error: "attendanceId, action and a reason of at least 5 characters are required" });
+    return;
+  }
+  const action = body.action as "in" | "out";
+  const [attendance] = await db.select().from(attendanceRecordsTable)
+    .where(eq(attendanceRecordsTable.id, body.attendanceId)).limit(1);
+  if (!attendance) {
+    res.status(404).json({ error: "Attendance record not found" });
+    return;
+  }
+  const requestedAt = now();
+  const [event] = await db.insert(attendanceEventsTable).values({
+    id: `attendance-correction-${randomUUID()}`,
+    attendanceId: attendance.id,
+    employeeId: attendance.employeeId,
+    employeeName: attendance.employeeName,
+    action,
+    status: "Pending approval",
+    capturedAt: body.correctedAt ? new Date(body.correctedAt) : null,
+    source: "supervisor",
+    idempotencyKey: `correction-${randomUUID()}`,
+    verification: "Correction requested",
+    reason: body.reason.trim(),
+    evidence: body.evidence ?? {},
+    actor: operatorFor(req),
+    receivedAt: requestedAt,
+  }).returning();
+  await db.update(attendanceRecordsTable).set({ correctionStatus: "Pending approval", updatedAt: requestedAt })
+    .where(eq(attendanceRecordsTable.id, attendance.id));
+  res.status(201).json({
+    id: event.id,
+    attendanceId: event.attendanceId,
+    action: event.action,
+    status: event.status,
+    reason: event.reason,
+    requestedBy: event.actor,
+    requestedAt: event.createdAt.toISOString(),
+  });
 });
 
 router.get("/team/guards", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (_req, res) => {
@@ -1408,10 +1844,81 @@ router.get("/contacts", (_req, res) => {
 
 router.get("/site-report/today", async (_req, res) => {
   const [policyRecord] = await db.select().from(operatingPoliciesTable).limit(1);
+  const [guards, attendance, scans, incidents] = await Promise.all([
+    db.select().from(guardsTable),
+    db.select().from(attendanceRecordsTable).where(eq(attendanceRecordsTable.attendanceDate, todayKey())),
+    db.select().from(patrolScansTable),
+    db.select().from(incidentRecordsTable),
+  ]);
+  const coverage = guards.length ? Math.round(guards.filter((guard) => guard.status === "On duty").length / guards.length * 100) : 0;
+  const attendancePercent = attendance.length ? Math.round(attendance.filter((record) => record.status !== "Absent").length / attendance.length * 100) : 0;
+  const patrolCompletion = scans.length ? Math.round(scans.filter((scan) => scan.status === "Verified").length / scans.length * 100) : 0;
   res.json({
-    ...siteReport,
-    site: policyRecord?.siteName ?? siteReport.site,
+    date: todayKey(),
+    site: policyRecord?.siteName ?? defaultPolicy.siteName,
+    coverage,
+    attendance: attendancePercent,
+    patrolCompletion,
+    openIssues: incidents.filter((incident) => incident.status !== "Closed").length,
+    status: "Live · compiled from persisted events",
   });
+});
+
+router.post("/tracking/heartbeat", requireRole("Field Officer"), async (req, res) => {
+  const body = req.body as {
+    employeeId?: string;
+    employeeName?: string;
+    city?: string;
+    site?: string;
+    dutyStatus?: string;
+    latitude?: number;
+    longitude?: number;
+    accuracyMeters?: number;
+    capturedAt?: string;
+    source?: string;
+    deviceId?: string;
+  };
+  const [policyRecord] = await db.select().from(operatingPoliciesTable).limit(1);
+  const policy = policyRecord ? policyInputFromRecord(policyRecord) : defaultPolicy;
+  if (!body.employeeName || typeof body.latitude !== "number" || typeof body.longitude !== "number" || !body.capturedAt || !body.city || !body.dutyStatus) {
+    res.status(400).json({ error: "employeeName, city, dutyStatus, coordinates and capturedAt are required" });
+    return;
+  }
+  if (!policy.tracking.enabled || !isWithinDutyWindow(now(), policy.tracking.startTime, policy.tracking.endTime, policy.timezone)) {
+    res.status(422).json({ error: `Tracking is only accepted during ${policy.tracking.startTime}–${policy.tracking.endTime} (${policy.timezone}).` });
+    return;
+  }
+  const capturedAt = new Date(body.capturedAt);
+  const accuracyTooLow = typeof body.accuracyMeters === "number"
+    && body.accuracyMeters > policy.maxLocationAccuracyMeters;
+  const cityDistance = body.city === policy.city
+    ? haversineMeters(body.latitude, body.longitude, policy.cityLatitude, policy.cityLongitude)
+    : null;
+  if (accuracyTooLow || cityDistance !== null && cityDistance > policy.cityRadiusMeters) {
+    res.status(422).json({
+      error: accuracyTooLow
+        ? `Location accuracy must be ${policy.maxLocationAccuracyMeters}m or better.`
+        : `Location is outside the authorized ${body.city} duty area.`,
+      distanceFromCityMeters: cityDistance,
+    });
+    return;
+  }
+  const [record] = await db.insert(locationHeartbeatsTable).values({
+    id: `heartbeat-${randomUUID()}`,
+    employeeId: body.employeeId ?? req.workforceAccess?.fieldOfficerId ?? req.workforceAccess?.userId ?? null,
+    employeeName: body.employeeName,
+    role: "Field Officer",
+    city: body.city,
+    site: body.site ?? req.workforceAccess?.siteName ?? null,
+    dutyStatus: body.dutyStatus,
+    latitude: body.latitude,
+    longitude: body.longitude,
+    accuracyMeters: body.accuracyMeters ?? null,
+    capturedAt,
+    source: body.source ?? "browser",
+    deviceId: body.deviceId ?? null,
+  }).returning();
+  res.status(201).json(heartbeatResponse(record, policy));
 });
 
 router.get("/tracking/field-officers", requireRole("Supervisor", "Security Officer", "Field Officer", "Management", "Control Room"), async (req, res) => {
@@ -1430,24 +1937,314 @@ router.get("/tracking/field-officers", requireRole("Supervisor", "Security Offic
   const assignedOfficerId = req.workforceAccess?.role === "Field Officer"
     ? req.workforceAccess.fieldOfficerId
     : undefined;
-  const filtered = fieldOfficers.filter((officer) =>
-    (!assignedOfficerId || officer.id === assignedOfficerId) &&
-    (!query.city || officer.city === query.city) &&
-    (!query.dutyStatus ||
-      (query.dutyStatus === "on_duty" && officer.dutyStatus === "On duty") ||
-      (query.dutyStatus === "off_duty" && officer.dutyStatus !== "On duty")),
-  ).map((officer) => ({
-    id: officer.id,
-    name: officer.name,
-    city: officer.city,
-    dutyStatus: officer.dutyStatus,
-    location: officer.location,
-    lastUpdate: officer.lastUpdate,
-    coordinates: officer.coordinates,
-    trackingWindow,
-    heartbeatMinutes: policy.tracking.heartbeatMinutes,
-  }));
+  const heartbeatRows = await db.select().from(locationHeartbeatsTable)
+    .orderBy(desc(locationHeartbeatsTable.capturedAt));
+  const latestByOfficer = new Map<string, typeof heartbeatRows[number]>();
+  for (const heartbeat of heartbeatRows) {
+    const key = heartbeat.employeeId ?? heartbeat.employeeName;
+    if (!latestByOfficer.has(key)) latestByOfficer.set(key, heartbeat);
+  }
+  const filtered = [...latestByOfficer.values()]
+    .filter((heartbeat) =>
+      (!assignedOfficerId || heartbeat.employeeId === assignedOfficerId) &&
+      (!query.city || heartbeat.city === query.city) &&
+      (!query.dutyStatus ||
+        (query.dutyStatus === "on_duty" && !heartbeatResponse(heartbeat, policy).stale && heartbeat.dutyStatus === "On duty") ||
+        (query.dutyStatus === "off_duty" && (heartbeatResponse(heartbeat, policy).stale || heartbeat.dutyStatus !== "On duty"))),
+    ).map((heartbeat) => {
+      const stale = heartbeatResponse(heartbeat, policy).stale;
+      const x = Math.min(Math.max(((heartbeat.longitude - 77.35) / 0.55) * 100, 8), 90);
+      const y = Math.min(Math.max(((13.15 - heartbeat.latitude) / 0.45) * 100, 10), 82);
+      return {
+        id: heartbeat.employeeId ?? heartbeat.id,
+        name: heartbeat.employeeName,
+        city: heartbeat.city,
+        dutyStatus: stale ? "Offline" : heartbeat.dutyStatus,
+        location: heartbeat.site ?? heartbeat.city,
+        lastUpdate: lastSeenValue(heartbeat.capturedAt),
+        coordinates: { x, y },
+        latitude: heartbeat.latitude,
+        longitude: heartbeat.longitude,
+        accuracyMeters: heartbeat.accuracyMeters,
+        stale,
+        trackingWindow,
+        heartbeatMinutes: policy.tracking.heartbeatMinutes,
+      };
+    });
   res.json(filtered);
+});
+
+router.get("/patrol/checkpoints", requireRole("Supervisor", "Security Officer", "Field Officer", "Management", "Control Room"), async (req, res) => {
+  const records = await db.select().from(patrolCheckpointsTable)
+    .where(eq(patrolCheckpointsTable.active, true))
+    .orderBy(asc(patrolCheckpointsTable.sequence));
+  const visible = records.filter((record) =>
+    ["Management", "Control Room"].includes(req.workforceAccess?.role ?? "")
+      || !record.site
+      || record.site === req.workforceAccess?.siteName,
+  );
+  res.json(visible.map(checkpointResponse));
+});
+
+router.post("/patrol/checkpoints", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const body = req.body as {
+    site?: string; name?: string; qrToken?: string; sequence?: number;
+    latitude?: number; longitude?: number; radiusMeters?: number;
+  };
+  if (!body.site || !body.name || !body.qrToken || typeof body.sequence !== "number") {
+    res.status(400).json({ error: "site, name, qrToken and sequence are required" });
+    return;
+  }
+  const [record] = await db.insert(patrolCheckpointsTable).values({
+    id: `checkpoint-${randomUUID()}`,
+    site: body.site,
+    name: body.name,
+    qrToken: body.qrToken,
+    sequence: body.sequence,
+    latitude: body.latitude ?? null,
+    longitude: body.longitude ?? null,
+    radiusMeters: body.radiusMeters ?? 50,
+  }).returning();
+  res.status(201).json(checkpointResponse(record));
+});
+
+router.post("/patrol/scans", requireRole("Guard", "Supervisor", "Security Officer", "Field Officer", "Management", "Control Room"), async (req, res) => {
+  const body = req.body as {
+    checkpointToken?: string; roundId?: string; latitude?: number; longitude?: number;
+    accuracyMeters?: number; note?: string; evidence?: Record<string, unknown>;
+  };
+  if (!body.checkpointToken || !body.roundId) {
+    res.status(400).json({ error: "checkpointToken and roundId are required" });
+    return;
+  }
+  const [checkpoint] = await db.select().from(patrolCheckpointsTable)
+    .where(and(eq(patrolCheckpointsTable.qrToken, body.checkpointToken), eq(patrolCheckpointsTable.active, true)))
+    .limit(1);
+  if (!checkpoint) {
+    res.status(422).json({ error: "Checkpoint QR is not configured or has been damaged. Ask a supervisor to replace it." });
+    return;
+  }
+  const [duplicate] = await db.select().from(patrolScansTable)
+    .where(and(eq(patrolScansTable.roundId, body.roundId), eq(patrolScansTable.checkpointId, checkpoint.id)))
+    .limit(1);
+  if (duplicate) {
+    res.json(patrolScanResponse(duplicate));
+    return;
+  }
+  const priorScans = await db.select().from(patrolScansTable)
+    .where(eq(patrolScansTable.roundId, body.roundId));
+  const expectedSequence = priorScans.length === 0
+    ? 1
+    : Math.max(...priorScans.map((scan) => {
+      const known = scan.checkpointId === checkpoint.id ? checkpoint.sequence : 0;
+      return known;
+    })) + 1;
+  const distance = typeof body.latitude === "number" && typeof body.longitude === "number"
+    && checkpoint.latitude !== null && checkpoint.longitude !== null
+    ? haversineMeters(body.latitude, body.longitude, checkpoint.latitude, checkpoint.longitude)
+    : null;
+  const status = checkpoint.sequence !== expectedSequence
+    ? "Out of sequence"
+    : distance !== null && distance > checkpoint.radiusMeters
+      ? "Location exception"
+      : "Verified";
+  const [record] = await db.insert(patrolScansTable).values({
+    id: `scan-${randomUUID()}`,
+    checkpointId: checkpoint.id,
+    roundId: body.roundId,
+    scannedBy: operatorFor(req),
+    latitude: body.latitude ?? null,
+    longitude: body.longitude ?? null,
+    accuracyMeters: body.accuracyMeters ?? null,
+    status,
+    note: body.note ?? (distance !== null ? `${Math.round(distance)}m from checkpoint` : null),
+    evidence: body.evidence ?? {},
+  }).returning();
+  res.status(201).json(patrolScanResponse(record));
+});
+
+router.get("/patrol/summary", requireRole("Supervisor", "Security Officer", "Field Officer", "Management", "Control Room"), async (_req, res) => {
+  const scans = await db.select().from(patrolScansTable);
+  const rounds = new Set(scans.map((scan) => scan.roundId)).size;
+  const completed = scans.filter((scan) => scan.status === "Verified").length;
+  const missed = scans.filter((scan) => scan.status !== "Verified").length;
+  res.json({
+    rounds,
+    completed,
+    missed,
+    completionPercent: scans.length ? Math.round(completed / scans.length * 100) : 0,
+  });
+});
+
+router.get("/incidents", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const records = await db.select().from(incidentRecordsTable)
+    .orderBy(desc(incidentRecordsTable.reportedAt));
+  const visible = records.filter((record) =>
+    ["Management", "Control Room"].includes(req.workforceAccess?.role ?? "")
+      || !record.site
+      || record.site === req.workforceAccess?.siteName,
+  );
+  res.json(visible.map(incidentResponse));
+});
+
+router.post("/incidents", requireRole("Guard", "Supervisor", "Security Officer", "Field Officer", "Management", "Control Room"), async (req, res) => {
+  const body = req.body as {
+    category?: string; severity?: string; title?: string; narrative?: string; site?: string;
+    affectedPeople?: string[]; affectedAssets?: string[]; latitude?: number; longitude?: number; dueAt?: string;
+  };
+  if (!body.category || !body.severity || !body.title || !body.narrative) {
+    res.status(400).json({ error: "category, severity, title and narrative are required" });
+    return;
+  }
+  const [record] = await db.insert(incidentRecordsTable).values({
+    id: `incident-${randomUUID()}`,
+    category: body.category,
+    severity: body.severity,
+    status: "Submitted",
+    title: body.title,
+    narrative: body.narrative,
+    site: body.site ?? req.workforceAccess?.siteName ?? null,
+    affectedPeople: body.affectedPeople ?? [],
+    affectedAssets: body.affectedAssets ?? [],
+    latitude: body.latitude ?? null,
+    longitude: body.longitude ?? null,
+    dueAt: body.dueAt ? new Date(body.dueAt) : null,
+    createdBy: operatorFor(req),
+  }).returning();
+  await db.insert(incidentEventsTable).values({
+    id: `incident-event-${randomUUID()}`,
+    incidentId: record.id,
+    toStatus: "Submitted",
+    actor: operatorFor(req),
+    note: "Incident submitted",
+  });
+  res.status(201).json(incidentResponse(record));
+});
+
+router.patch("/incidents/:id/status", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const id = String(req.params.id);
+  const body = req.body as { status?: string; note?: string };
+  const validStatuses = ["Submitted", "Acknowledged", "Assigned", "In Progress", "Contained", "Closed", "Reopened"];
+  if (!body.status || !validStatuses.includes(body.status)) {
+    res.status(400).json({ error: "Invalid incident lifecycle status" });
+    return;
+  }
+  const [existing] = await db.select().from(incidentRecordsTable)
+    .where(eq(incidentRecordsTable.id, id)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Incident not found" });
+    return;
+  }
+  const timestamp = now();
+  const [record] = await db.update(incidentRecordsTable).set({
+    status: body.status,
+    ...(body.status === "Acknowledged" ? { acknowledgedAt: timestamp } : {}),
+    ...(body.status === "Assigned" ? { assignedAt: timestamp, assignedTo: operatorFor(req) } : {}),
+    ...(body.status === "Contained" ? { containedAt: timestamp } : {}),
+    ...(body.status === "Closed" ? { closedAt: timestamp } : {}),
+    updatedAt: timestamp,
+  }).where(eq(incidentRecordsTable.id, id)).returning();
+  await db.insert(incidentEventsTable).values({
+    id: `incident-event-${randomUUID()}`,
+    incidentId: id,
+    fromStatus: existing.status,
+    toStatus: body.status,
+    actor: operatorFor(req),
+    note: body.note ?? null,
+  });
+  res.json(incidentResponse(record));
+});
+
+router.get("/roster/today", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const records = await db.select().from(rosterAssignmentsTable)
+    .where(eq(rosterAssignmentsTable.rosterDate, todayKey()))
+    .orderBy(asc(rosterAssignmentsTable.shift), asc(rosterAssignmentsTable.post));
+  res.json(records.filter((record) =>
+    ["Management", "Control Room"].includes(req.workforceAccess?.role ?? "")
+      || record.site === req.workforceAccess?.siteName,
+  ).map(rosterResponse));
+});
+
+router.post("/roster/today", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const body = req.body as {
+    employeeId?: string; employeeName?: string; site?: string; post?: string; shift?: string;
+    rosterDate?: string; replacementFor?: string;
+  };
+  if (!body.employeeId || !body.employeeName || !body.site || !body.post || !body.shift) {
+    res.status(400).json({ error: "employeeId, employeeName, site, post and shift are required" });
+    return;
+  }
+  const rosterDate = body.rosterDate ?? todayKey();
+  const [conflict] = await db.select().from(rosterAssignmentsTable)
+    .where(and(
+      eq(rosterAssignmentsTable.rosterDate, rosterDate),
+      eq(rosterAssignmentsTable.post, body.post),
+      eq(rosterAssignmentsTable.shift, body.shift),
+    )).limit(1);
+  if (conflict && !body.replacementFor) {
+    res.status(409).json({ error: "This post and shift already have an assignment.", conflict: rosterResponse(conflict) });
+    return;
+  }
+  const [record] = await db.insert(rosterAssignmentsTable).values({
+    id: `roster-${randomUUID()}`,
+    employeeId: body.employeeId,
+    employeeName: body.employeeName,
+    site: body.site,
+    post: body.post,
+    shift: body.shift,
+    rosterDate,
+    status: body.replacementFor ? "Replacement pending" : "Published",
+    replacementFor: body.replacementFor ?? null,
+    createdBy: operatorFor(req),
+  }).returning();
+  res.status(201).json(rosterResponse(record));
+});
+
+router.get("/compliance", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const records = await db.select().from(complianceRecordsTable).orderBy(asc(complianceRecordsTable.expiresAt));
+  res.json(records.filter((record) =>
+    ["Management", "Control Room"].includes(req.workforceAccess?.role ?? "")
+      || record.metadata && (record.metadata.site as string | undefined) === req.workforceAccess?.siteName
+      || true,
+  ).map(complianceResponse));
+});
+
+router.get("/reports/today", async (req, res) => {
+  const [record] = await db.select().from(operationalReportsTable)
+    .where(eq(operationalReportsTable.reportDate, todayKey())).limit(1);
+  if (!record) {
+    res.status(404).json({ error: "Daily Activity Report not submitted" });
+    return;
+  }
+  res.json(reportResponse(record));
+});
+
+router.post("/reports/today", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const body = req.body as { site?: string; data?: Record<string, unknown> };
+  if (!body.site || !body.data) {
+    res.status(400).json({ error: "site and data are required" });
+    return;
+  }
+  const [existing] = await db.select().from(operationalReportsTable)
+    .where(eq(operationalReportsTable.reportDate, todayKey())).limit(1);
+  const timestamp = now();
+  const record = existing
+    ? (await db.update(operationalReportsTable).set({
+        site: body.site,
+        data: body.data,
+        status: "Submitted",
+        submittedBy: operatorFor(req),
+        updatedAt: timestamp,
+      }).where(eq(operationalReportsTable.id, existing.id)).returning())[0]
+    : (await db.insert(operationalReportsTable).values({
+        id: `report-${todayKey()}`,
+        reportDate: todayKey(),
+        site: body.site,
+        status: "Submitted",
+        submittedBy: operatorFor(req),
+        data: body.data,
+      }).returning())[0];
+  res.status(existing ? 200 : 201).json(reportResponse(record));
 });
 
 router.get("/employee-submissions", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
@@ -1510,6 +2307,44 @@ router.get("/requests", async (_req, res) => {
   const records = await db.select().from(requestsTable)
     .orderBy(desc(requestsTable.submittedAt));
   res.json(records.map((record) => requestResponse(record, policy)));
+});
+
+router.patch("/requests/:id/status", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const status = (req.body as { status?: string }).status;
+  const allowed = ["Pending review", "Approved", "Rejected", "Needs information", "Paid"];
+  if (!status || !allowed.includes(status)) {
+    res.status(400).json({ error: "Invalid request status" });
+    return;
+  }
+  const [existing] = await db.select().from(requestsTable)
+    .where(eq(requestsTable.id, String(req.params.id))).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Request not found" });
+    return;
+  }
+  const [policyRecord] = await db.select().from(operatingPoliciesTable).limit(1);
+  const policy = policyRecord ? policyInputFromRecord(policyRecord) : defaultPolicy;
+  const timestamp = now();
+  const [record] = await db.update(requestsTable).set({
+    status,
+    approvalData: {
+      ...existing.approvalData,
+      lastDecision: status,
+      note: (req.body as { note?: string }).note ?? null,
+      decidedBy: operatorFor(req),
+      decidedAt: timestamp.toISOString(),
+    },
+  }).where(eq(requestsTable.id, existing.id)).returning();
+  await db.insert(auditEventsTable).values({
+    id: randomUUID(),
+    entityType: "request",
+    entityId: existing.id,
+    action: `request_${status.toLowerCase().replaceAll(" ", "_")}`,
+    actorId: operatorFor(req),
+    summary: `${existing.type} marked ${status}`,
+    metadata: { note: (req.body as { note?: string }).note ?? null },
+  });
+  res.json(requestResponse(record, policy));
 });
 
 async function createRequest(

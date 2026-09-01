@@ -132,6 +132,15 @@ export const GetOperatingPolicyResponse = zod.object({
 })),
   "geofenceRadiusMeters": zod.number().min(1),
   "geofenceRequireInside": zod.boolean(),
+  "siteLatitude": zod.number().optional(),
+  "siteLongitude": zod.number().optional(),
+  "city": zod.string().optional(),
+  "cityLatitude": zod.number().optional(),
+  "cityLongitude": zod.number().optional(),
+  "cityRadiusMeters": zod.number().optional(),
+  "attendanceGraceMinutes": zod.number().optional(),
+  "maxLocationAccuracyMeters": zod.number().optional(),
+  "offlineAttendanceEnabled": zod.boolean().optional(),
   "tracking": zod.object({
   "enabled": zod.boolean(),
   "startTime": zod.string(),
@@ -199,6 +208,15 @@ export const UpdateOperatingPolicyBody = zod.object({
 })).min(1),
   "geofenceRadiusMeters": zod.number().min(1).max(updateOperatingPolicyBodyGeofenceRadiusMetersMax),
   "geofenceRequireInside": zod.boolean(),
+  "siteLatitude": zod.number().optional(),
+  "siteLongitude": zod.number().optional(),
+  "city": zod.string().optional(),
+  "cityLatitude": zod.number().optional(),
+  "cityLongitude": zod.number().optional(),
+  "cityRadiusMeters": zod.number().optional(),
+  "attendanceGraceMinutes": zod.number().optional(),
+  "maxLocationAccuracyMeters": zod.number().optional(),
+  "offlineAttendanceEnabled": zod.boolean().optional(),
   "tracking": zod.object({
   "enabled": zod.boolean(),
   "startTime": zod.string(),
@@ -253,6 +271,15 @@ export const UpdateOperatingPolicyResponse = zod.object({
 })),
   "geofenceRadiusMeters": zod.number().min(1),
   "geofenceRequireInside": zod.boolean(),
+  "siteLatitude": zod.number().optional(),
+  "siteLongitude": zod.number().optional(),
+  "city": zod.string().optional(),
+  "cityLatitude": zod.number().optional(),
+  "cityLongitude": zod.number().optional(),
+  "cityRadiusMeters": zod.number().optional(),
+  "attendanceGraceMinutes": zod.number().optional(),
+  "maxLocationAccuracyMeters": zod.number().optional(),
+  "offlineAttendanceEnabled": zod.boolean().optional(),
   "tracking": zod.object({
   "enabled": zod.boolean(),
   "startTime": zod.string(),
@@ -350,6 +377,10 @@ export const GetTodayAttendanceResponse = zod.object({
   "punchIn": zod.string().nullable(),
   "punchOut": zod.string().nullable(),
   "geofence": zod.string(),
+  "punchInVerification": zod.string().nullable(),
+  "punchOutVerification": zod.string().nullable(),
+  "punchInAccuracyMeters": zod.number().nullish(),
+  "punchOutAccuracyMeters": zod.number().nullish(),
   "siteAddress": zod.string(),
   "geofenceRadiusMeters": zod.number(),
   "shiftWindow": zod.string()
@@ -359,10 +390,28 @@ export const GetTodayAttendanceResponse = zod.object({
 /**
  * @summary Punch in or out with geofence context
  */
+export const punchAttendanceBodyLatitudeMin = -90;
+export const punchAttendanceBodyLatitudeMax = 90;
+
+export const punchAttendanceBodyLongitudeMin = -180;
+export const punchAttendanceBodyLongitudeMax = 180;
+
+export const punchAttendanceBodyAccuracyMetersMin = 0;
+
+export const punchAttendanceBodyIdempotencyKeyMin = 8;
+
+
+
 export const PunchAttendanceBody = zod.object({
   "action": zod.enum(['in', 'out']),
   "location": zod.string(),
-  "geofenceVerified": zod.boolean().optional()
+  "geofenceVerified": zod.boolean().optional(),
+  "latitude": zod.number().min(punchAttendanceBodyLatitudeMin).max(punchAttendanceBodyLatitudeMax).optional(),
+  "longitude": zod.number().min(punchAttendanceBodyLongitudeMin).max(punchAttendanceBodyLongitudeMax).optional(),
+  "accuracyMeters": zod.number().min(punchAttendanceBodyAccuracyMetersMin).optional(),
+  "capturedAt": zod.coerce.date().optional(),
+  "source": zod.enum(['online', 'offline', 'supervisor']).optional(),
+  "idempotencyKey": zod.string().min(punchAttendanceBodyIdempotencyKeyMin).optional()
 })
 
 export const PunchAttendanceResponse = zod.object({
@@ -374,9 +423,58 @@ export const PunchAttendanceResponse = zod.object({
   "punchIn": zod.string().nullable(),
   "punchOut": zod.string().nullable(),
   "geofence": zod.string(),
+  "punchInVerification": zod.string().nullable(),
+  "punchOutVerification": zod.string().nullable(),
+  "punchInAccuracyMeters": zod.number().nullish(),
+  "punchOutAccuracyMeters": zod.number().nullish(),
   "siteAddress": zod.string(),
   "geofenceRadiusMeters": zod.number(),
   "shiftWindow": zod.string()
+})
+
+
+/**
+ * @summary Record a Field Officer location heartbeat
+ */
+
+
+export const postLocationHeartbeatBodyLatitudeMin = -90;
+export const postLocationHeartbeatBodyLatitudeMax = 90;
+
+export const postLocationHeartbeatBodyLongitudeMin = -180;
+export const postLocationHeartbeatBodyLongitudeMax = 180;
+
+export const postLocationHeartbeatBodyAccuracyMetersMin = 0;
+
+
+
+export const PostLocationHeartbeatBody = zod.object({
+  "employeeId": zod.string().optional(),
+  "employeeName": zod.string().min(1),
+  "city": zod.string().min(1),
+  "site": zod.string().optional(),
+  "dutyStatus": zod.string(),
+  "latitude": zod.number().min(postLocationHeartbeatBodyLatitudeMin).max(postLocationHeartbeatBodyLatitudeMax),
+  "longitude": zod.number().min(postLocationHeartbeatBodyLongitudeMin).max(postLocationHeartbeatBodyLongitudeMax),
+  "accuracyMeters": zod.number().min(postLocationHeartbeatBodyAccuracyMetersMin).optional(),
+  "capturedAt": zod.coerce.date(),
+  "source": zod.string().optional(),
+  "deviceId": zod.string().optional()
+})
+
+export const PostLocationHeartbeatResponse = zod.object({
+  "id": zod.string(),
+  "employeeId": zod.string().nullish(),
+  "employeeName": zod.string(),
+  "city": zod.string(),
+  "site": zod.string().nullish(),
+  "dutyStatus": zod.string(),
+  "latitude": zod.number(),
+  "longitude": zod.number(),
+  "accuracyMeters": zod.number().nullish(),
+  "capturedAt": zod.string(),
+  "receivedAt": zod.string(),
+  "stale": zod.boolean()
 })
 
 
@@ -414,6 +512,56 @@ export const TriggerSosResponse = zod.object({
   "triggeredBy": zod.string(),
   "acknowledgementWindowMinutes": zod.number(),
   "acknowledgementDueAt": zod.string()
+})
+
+
+/**
+ * @summary Transition an SOS through acknowledgement and dispatch
+ */
+export const TransitionSosParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const TransitionSosBody = zod.object({
+  "status": zod.enum(['Triggered', 'Delivered', 'Acknowledged', 'Dispatched', 'Safe', 'Escalated', 'Closed']),
+  "note": zod.string().optional()
+})
+
+export const TransitionSosResponse = zod.object({
+  "id": zod.string(),
+  "status": zod.string(),
+  "employeeName": zod.string(),
+  "location": zod.string(),
+  "createdAt": zod.string(),
+  "triggeredBy": zod.string(),
+  "acknowledgementWindowMinutes": zod.number(),
+  "acknowledgementDueAt": zod.string()
+})
+
+
+/**
+ * @summary Request an attendance correction with a reason
+ */
+export const requestAttendanceCorrectionBodyReasonMin = 5;
+
+
+
+export const RequestAttendanceCorrectionBody = zod.object({
+  "attendanceId": zod.string(),
+  "action": zod.enum(['in', 'out']),
+  "correctedAt": zod.coerce.date().optional(),
+  "reason": zod.string().min(requestAttendanceCorrectionBodyReasonMin),
+  "evidence": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+export const RequestAttendanceCorrectionResponse = zod.object({
+  "id": zod.string(),
+  "attendanceId": zod.string(),
+  "action": zod.string(),
+  "status": zod.string(),
+  "reason": zod.string(),
+  "requestedBy": zod.string(),
+  "requestedAt": zod.string()
 })
 
 
@@ -530,9 +678,342 @@ export const GetFieldOfficerTrackingResponseItem = zod.object({
   "coordinates": zod.object({
   "x": zod.number(),
   "y": zod.number()
-})
+}),
+  "latitude": zod.number().nullable(),
+  "longitude": zod.number().nullable(),
+  "accuracyMeters": zod.number().nullable(),
+  "stale": zod.boolean()
 })
 export const GetFieldOfficerTrackingResponse = zod.array(GetFieldOfficerTrackingResponseItem)
+
+
+/**
+ * @summary List configured QR patrol checkpoints
+ */
+export const GetPatrolCheckpointsResponseItem = zod.object({
+  "id": zod.string(),
+  "site": zod.string(),
+  "name": zod.string(),
+  "qrToken": zod.string(),
+  "sequence": zod.number(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "radiusMeters": zod.number(),
+  "active": zod.boolean()
+})
+export const GetPatrolCheckpointsResponse = zod.array(GetPatrolCheckpointsResponseItem)
+
+
+/**
+ * @summary Configure a QR patrol checkpoint
+ */
+
+
+export const createPatrolCheckpointBodyQrTokenMin = 4;
+
+
+
+
+
+export const CreatePatrolCheckpointBody = zod.object({
+  "site": zod.string().min(1),
+  "name": zod.string().min(1),
+  "qrToken": zod.string().min(createPatrolCheckpointBodyQrTokenMin),
+  "sequence": zod.number().min(1),
+  "latitude": zod.number().optional(),
+  "longitude": zod.number().optional(),
+  "radiusMeters": zod.number().min(1).optional()
+})
+
+export const CreatePatrolCheckpointResponse = zod.object({
+  "id": zod.string(),
+  "site": zod.string(),
+  "name": zod.string(),
+  "qrToken": zod.string(),
+  "sequence": zod.number(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "radiusMeters": zod.number(),
+  "active": zod.boolean()
+})
+
+
+/**
+ * @summary Record a QR checkpoint scan
+ */
+export const recordPatrolScanBodyCheckpointTokenMin = 4;
+
+
+
+
+export const RecordPatrolScanBody = zod.object({
+  "checkpointToken": zod.string().min(recordPatrolScanBodyCheckpointTokenMin),
+  "roundId": zod.string().min(1),
+  "latitude": zod.number().optional(),
+  "longitude": zod.number().optional(),
+  "accuracyMeters": zod.number().optional(),
+  "note": zod.string().optional(),
+  "evidence": zod.record(zod.string(), zod.unknown()).optional()
+})
+
+export const RecordPatrolScanResponse = zod.object({
+  "id": zod.string(),
+  "checkpointId": zod.string(),
+  "roundId": zod.string(),
+  "scannedBy": zod.string(),
+  "scannedAt": zod.string(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "accuracyMeters": zod.number().nullish(),
+  "status": zod.string(),
+  "note": zod.string().nullish()
+})
+
+
+/**
+ * @summary Get persisted patrol completion metrics
+ */
+export const GetPatrolSummaryResponse = zod.object({
+  "rounds": zod.number(),
+  "completed": zod.number(),
+  "missed": zod.number(),
+  "completionPercent": zod.number()
+})
+
+
+/**
+ * @summary List structured incidents
+ */
+export const GetIncidentsResponseItem = zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "severity": zod.string(),
+  "status": zod.string(),
+  "title": zod.string(),
+  "narrative": zod.string(),
+  "site": zod.string().nullish(),
+  "affectedPeople": zod.array(zod.string()).optional(),
+  "affectedAssets": zod.array(zod.string()).optional(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "reportedAt": zod.string(),
+  "dueAt": zod.string().nullish(),
+  "assignedTo": zod.string().nullish(),
+  "createdBy": zod.string()
+})
+export const GetIncidentsResponse = zod.array(GetIncidentsResponseItem)
+
+
+/**
+ * @summary Report a structured incident
+ */
+
+
+
+
+export const CreateIncidentBody = zod.object({
+  "category": zod.string(),
+  "severity": zod.enum(['Low', 'Medium', 'High', 'Critical']),
+  "title": zod.string().min(1),
+  "narrative": zod.string().min(1),
+  "site": zod.string().optional(),
+  "affectedPeople": zod.array(zod.string()).optional(),
+  "affectedAssets": zod.array(zod.string()).optional(),
+  "latitude": zod.number().optional(),
+  "longitude": zod.number().optional(),
+  "dueAt": zod.coerce.date().optional()
+})
+
+export const CreateIncidentResponse = zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "severity": zod.string(),
+  "status": zod.string(),
+  "title": zod.string(),
+  "narrative": zod.string(),
+  "site": zod.string().nullish(),
+  "affectedPeople": zod.array(zod.string()).optional(),
+  "affectedAssets": zod.array(zod.string()).optional(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "reportedAt": zod.string(),
+  "dueAt": zod.string().nullish(),
+  "assignedTo": zod.string().nullish(),
+  "createdBy": zod.string()
+})
+
+
+/**
+ * @summary Transition an incident through its control-room lifecycle
+ */
+export const TransitionIncidentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const TransitionIncidentBody = zod.object({
+  "status": zod.enum(['Submitted', 'Acknowledged', 'Assigned', 'In Progress', 'Contained', 'Closed', 'Reopened']),
+  "note": zod.string().optional()
+})
+
+export const TransitionIncidentResponse = zod.object({
+  "id": zod.string(),
+  "category": zod.string(),
+  "severity": zod.string(),
+  "status": zod.string(),
+  "title": zod.string(),
+  "narrative": zod.string(),
+  "site": zod.string().nullish(),
+  "affectedPeople": zod.array(zod.string()).optional(),
+  "affectedAssets": zod.array(zod.string()).optional(),
+  "latitude": zod.number().nullish(),
+  "longitude": zod.number().nullish(),
+  "reportedAt": zod.string(),
+  "dueAt": zod.string().nullish(),
+  "assignedTo": zod.string().nullish(),
+  "createdBy": zod.string()
+})
+
+
+/**
+ * @summary List today's persisted roster assignments
+ */
+export const GetTodayRosterResponseItem = zod.object({
+  "id": zod.string(),
+  "employeeId": zod.string(),
+  "employeeName": zod.string(),
+  "site": zod.string(),
+  "post": zod.string(),
+  "shift": zod.string(),
+  "rosterDate": zod.string(),
+  "status": zod.string(),
+  "acknowledgedAt": zod.string().nullish(),
+  "replacementFor": zod.string().nullish(),
+  "lockedAt": zod.string().nullish(),
+  "conflictReason": zod.string().nullish()
+})
+export const GetTodayRosterResponse = zod.array(GetTodayRosterResponseItem)
+
+
+/**
+ * @summary Add an assignment to today's roster
+ */
+export const CreateRosterAssignmentBody = zod.object({
+  "employeeId": zod.string(),
+  "employeeName": zod.string(),
+  "site": zod.string(),
+  "post": zod.string(),
+  "shift": zod.string(),
+  "rosterDate": zod.string().optional(),
+  "replacementFor": zod.string().optional()
+})
+
+export const CreateRosterAssignmentResponse = zod.object({
+  "id": zod.string(),
+  "employeeId": zod.string(),
+  "employeeName": zod.string(),
+  "site": zod.string(),
+  "post": zod.string(),
+  "shift": zod.string(),
+  "rosterDate": zod.string(),
+  "status": zod.string(),
+  "acknowledgedAt": zod.string().nullish(),
+  "replacementFor": zod.string().nullish(),
+  "lockedAt": zod.string().nullish(),
+  "conflictReason": zod.string().nullish()
+})
+
+
+/**
+ * @summary List employee compliance records
+ */
+export const GetComplianceRecordsResponseItem = zod.object({
+  "id": zod.string(),
+  "employeeId": zod.string(),
+  "employeeName": zod.string(),
+  "kind": zod.string(),
+  "reference": zod.string().nullish(),
+  "status": zod.string(),
+  "expiresAt": zod.string().nullish(),
+  "verifiedAt": zod.string().nullish()
+})
+export const GetComplianceRecordsResponse = zod.array(GetComplianceRecordsResponseItem)
+
+
+/**
+ * @summary Get today's persisted Daily Activity Report
+ */
+export const GetTodayOperationalReportResponse = zod.object({
+  "id": zod.string(),
+  "reportDate": zod.string(),
+  "site": zod.string(),
+  "status": zod.string(),
+  "submittedBy": zod.string().nullish(),
+  "approvedBy": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "data": zod.record(zod.string(), zod.unknown())
+})
+
+
+/**
+ * @summary Submit or update today's Daily Activity Report
+ */
+export const SubmitTodayOperationalReportBody = zod.object({
+  "site": zod.string(),
+  "data": zod.record(zod.string(), zod.unknown())
+})
+
+export const SubmitTodayOperationalReportResponse = zod.object({
+  "id": zod.string(),
+  "reportDate": zod.string(),
+  "site": zod.string(),
+  "status": zod.string(),
+  "submittedBy": zod.string().nullish(),
+  "approvedBy": zod.string().nullish(),
+  "approvedAt": zod.string().nullish(),
+  "data": zod.record(zod.string(), zod.unknown())
+})
+
+
+/**
+ * @summary Approve or reject an employee request
+ */
+export const TransitionRequestParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const TransitionRequestBody = zod.object({
+  "status": zod.enum(['Pending review', 'Approved', 'Rejected', 'Needs information', 'Paid']),
+  "note": zod.string().optional()
+})
+
+export const TransitionRequestResponse = zod.object({
+  "id": zod.string(),
+  "type": zod.string(),
+  "summary": zod.string(),
+  "submittedAt": zod.string(),
+  "status": zod.string(),
+  "submittedBy": zod.string(),
+  "approvalPath": zod.string()
+})
+
+
+/**
+ * @summary Create a short-lived private evidence upload URL
+ */
+
+
+
+export const RequestEvidenceUploadUrlBody = zod.object({
+  "name": zod.string(),
+  "size": zod.number().min(1),
+  "contentType": zod.string()
+})
+
+export const RequestEvidenceUploadUrlResponse = zod.object({
+  "uploadURL": zod.string(),
+  "objectPath": zod.string(),
+  "metadata": zod.record(zod.string(), zod.unknown()).optional()
+})
 
 
 /**

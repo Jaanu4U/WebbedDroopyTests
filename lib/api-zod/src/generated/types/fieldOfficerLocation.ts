@@ -17,4 +17,11 @@ export interface FieldOfficerLocation {
   trackingWindow: string;
   heartbeatMinutes: number;
   coordinates: FieldOfficerLocationCoordinates;
+  /** @nullable */
+  latitude: number | null;
+  /** @nullable */
+  longitude: number | null;
+  /** @nullable */
+  accuracyMeters: number | null;
+  stale: boolean;
 }

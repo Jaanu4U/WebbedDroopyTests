@@ -21,17 +21,22 @@ import type {
 
 import type {
   Activity,
+  AttendanceCorrection,
+  AttendanceCorrectionInput,
   AttendancePunchInput,
   AttendanceRecord,
   AuditEvent,
   BillSubmissionInput,
   ChecklistItem,
   ChecklistUpdate,
+  ComplianceRecord,
   DashboardSummary,
   EmployeeDecisionInput,
   EmployeeSubmission,
   EmployeeSubmissionInput,
   EscalationContact,
+  EvidenceUpload,
+  EvidenceUploadInput,
   FieldOfficerLocation,
   FieldOfficerRecord,
   GetAdminWorkforceUsersParams,
@@ -41,17 +46,33 @@ import type {
   GetWorkforceWorkbenchParams,
   Guard,
   HealthStatus,
+  Incident,
+  IncidentInput,
+  IncidentStatusInput,
   LeaveRequestInput,
+  LocationHeartbeat,
+  LocationHeartbeatInput,
   OperatingPolicy,
   OperatingPolicyConflict,
   OperatingPolicyRevision,
   OperatingPolicyUpdate,
+  OperationalReport,
+  OperationalReportInput,
+  PatrolCheckpoint,
+  PatrolCheckpointInput,
+  PatrolScan,
+  PatrolScanInput,
+  PatrolSummary,
   Payslip,
   RequestRecord,
+  RequestStatusInput,
+  RosterAssignment,
+  RosterAssignmentInput,
   SalaryAdvanceInput,
   SiteReport,
   SosAlert,
   SosInput,
+  SosStatusInput,
   WorkforceItem,
   WorkforceItemInput,
   WorkforceItemTransition,
@@ -1114,6 +1135,86 @@ export const usePunchAttendance = <TError = ErrorType<unknown>,
       return useMutation(getPunchAttendanceMutationOptions(options));
     }
 
+export const getPostLocationHeartbeatUrl = () => {
+
+
+
+
+  return `/api/tracking/heartbeat`
+}
+
+/**
+ * @summary Record a Field Officer location heartbeat
+ */
+export const postLocationHeartbeat = async (locationHeartbeatInput: LocationHeartbeatInput, options?: Parameters<typeof customFetch>[1]): Promise<LocationHeartbeat> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<LocationHeartbeat>(getPostLocationHeartbeatUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(locationHeartbeatInput)
+  }
+);}
+
+
+
+
+
+export const getPostLocationHeartbeatMutationKey = () => ['postLocationHeartbeat'] as const;
+
+export const getPostLocationHeartbeatMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLocationHeartbeat>>, TError,PostLocationHeartbeatMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof postLocationHeartbeat>>, TError,PostLocationHeartbeatMutationVariables, TContext> => {
+
+const mutationKey = getPostLocationHeartbeatMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof postLocationHeartbeat>>, PostLocationHeartbeatMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  postLocationHeartbeat(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PostLocationHeartbeatMutationResult = NonNullable<Awaited<ReturnType<typeof postLocationHeartbeat>>>
+    export type PostLocationHeartbeatMutationBody = BodyType<LocationHeartbeatInput>
+    export type PostLocationHeartbeatMutationError = ErrorType<unknown>
+    export type PostLocationHeartbeatMutationVariables = {data: BodyType<LocationHeartbeatInput>}
+
+    /**
+ * @summary Record a Field Officer location heartbeat
+ */
+export const usePostLocationHeartbeat = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof postLocationHeartbeat>>, TError,PostLocationHeartbeatMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof postLocationHeartbeat>>,
+        TError,
+        PostLocationHeartbeatMutationVariables,
+        TContext
+      > => {
+      return useMutation(getPostLocationHeartbeatMutationOptions(options));
+    }
+
 export const getGetSosAlertsUrl = () => {
 
 
@@ -1269,6 +1370,167 @@ export const useTriggerSos = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getTriggerSosMutationOptions(options));
+    }
+
+export const getTransitionSosUrl = (id: string,) => {
+
+
+
+
+  return `/api/emergency/sos/${id}/status`
+}
+
+/**
+ * @summary Transition an SOS through acknowledgement and dispatch
+ */
+export const transitionSos = async (id: string,
+    sosStatusInput: SosStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<SosAlert> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<SosAlert>(getTransitionSosUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(sosStatusInput)
+  }
+);}
+
+
+
+
+
+export const getTransitionSosMutationKey = () => ['transitionSos'] as const;
+
+export const getTransitionSosMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionSos>>, TError,TransitionSosMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transitionSos>>, TError,TransitionSosMutationVariables, TContext> => {
+
+const mutationKey = getTransitionSosMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transitionSos>>, TransitionSosMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  transitionSos(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransitionSosMutationResult = NonNullable<Awaited<ReturnType<typeof transitionSos>>>
+    export type TransitionSosMutationBody = BodyType<SosStatusInput>
+    export type TransitionSosMutationError = ErrorType<unknown>
+    export type TransitionSosMutationVariables = {id: string;data: BodyType<SosStatusInput>}
+
+    /**
+ * @summary Transition an SOS through acknowledgement and dispatch
+ */
+export const useTransitionSos = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionSos>>, TError,TransitionSosMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transitionSos>>,
+        TError,
+        TransitionSosMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTransitionSosMutationOptions(options));
+    }
+
+export const getRequestAttendanceCorrectionUrl = () => {
+
+
+
+
+  return `/api/attendance/corrections`
+}
+
+/**
+ * @summary Request an attendance correction with a reason
+ */
+export const requestAttendanceCorrection = async (attendanceCorrectionInput: AttendanceCorrectionInput, options?: Parameters<typeof customFetch>[1]): Promise<AttendanceCorrection> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<AttendanceCorrection>(getRequestAttendanceCorrectionUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(attendanceCorrectionInput)
+  }
+);}
+
+
+
+
+
+export const getRequestAttendanceCorrectionMutationKey = () => ['requestAttendanceCorrection'] as const;
+
+export const getRequestAttendanceCorrectionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestAttendanceCorrection>>, TError,RequestAttendanceCorrectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestAttendanceCorrection>>, TError,RequestAttendanceCorrectionMutationVariables, TContext> => {
+
+const mutationKey = getRequestAttendanceCorrectionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestAttendanceCorrection>>, RequestAttendanceCorrectionMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestAttendanceCorrection(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestAttendanceCorrectionMutationResult = NonNullable<Awaited<ReturnType<typeof requestAttendanceCorrection>>>
+    export type RequestAttendanceCorrectionMutationBody = BodyType<AttendanceCorrectionInput>
+    export type RequestAttendanceCorrectionMutationError = ErrorType<unknown>
+    export type RequestAttendanceCorrectionMutationVariables = {data: BodyType<AttendanceCorrectionInput>}
+
+    /**
+ * @summary Request an attendance correction with a reason
+ */
+export const useRequestAttendanceCorrection = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestAttendanceCorrection>>, TError,RequestAttendanceCorrectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestAttendanceCorrection>>,
+        TError,
+        RequestAttendanceCorrectionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestAttendanceCorrectionMutationOptions(options));
     }
 
 export const getGetTeamGuardsUrl = () => {
@@ -1817,6 +2079,1110 @@ export function useGetFieldOfficerTracking<TData = Awaited<ReturnType<typeof get
 
 
 
+
+export const getGetPatrolCheckpointsUrl = () => {
+
+
+
+
+  return `/api/patrol/checkpoints`
+}
+
+/**
+ * @summary List configured QR patrol checkpoints
+ */
+export const getPatrolCheckpoints = async ( options?: Parameters<typeof customFetch>[1]): Promise<PatrolCheckpoint[]> => {
+
+  return customFetch<PatrolCheckpoint[]>(getGetPatrolCheckpointsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPatrolCheckpointsQueryKey = () => {
+    return [
+    `/api/patrol/checkpoints`
+    ] as const;
+    }
+
+
+export const getGetPatrolCheckpointsQueryOptions = <TData = Awaited<ReturnType<typeof getPatrolCheckpoints>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatrolCheckpoints>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPatrolCheckpointsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPatrolCheckpoints>>> = ({ signal }) => getPatrolCheckpoints({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPatrolCheckpoints>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPatrolCheckpointsQueryResult = NonNullable<Awaited<ReturnType<typeof getPatrolCheckpoints>>>
+export type GetPatrolCheckpointsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List configured QR patrol checkpoints
+ */
+
+export function useGetPatrolCheckpoints<TData = Awaited<ReturnType<typeof getPatrolCheckpoints>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatrolCheckpoints>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPatrolCheckpointsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreatePatrolCheckpointUrl = () => {
+
+
+
+
+  return `/api/patrol/checkpoints`
+}
+
+/**
+ * @summary Configure a QR patrol checkpoint
+ */
+export const createPatrolCheckpoint = async (patrolCheckpointInput: PatrolCheckpointInput, options?: Parameters<typeof customFetch>[1]): Promise<PatrolCheckpoint> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<PatrolCheckpoint>(getCreatePatrolCheckpointUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(patrolCheckpointInput)
+  }
+);}
+
+
+
+
+
+export const getCreatePatrolCheckpointMutationKey = () => ['createPatrolCheckpoint'] as const;
+
+export const getCreatePatrolCheckpointMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPatrolCheckpoint>>, TError,CreatePatrolCheckpointMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createPatrolCheckpoint>>, TError,CreatePatrolCheckpointMutationVariables, TContext> => {
+
+const mutationKey = getCreatePatrolCheckpointMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createPatrolCheckpoint>>, CreatePatrolCheckpointMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createPatrolCheckpoint(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreatePatrolCheckpointMutationResult = NonNullable<Awaited<ReturnType<typeof createPatrolCheckpoint>>>
+    export type CreatePatrolCheckpointMutationBody = BodyType<PatrolCheckpointInput>
+    export type CreatePatrolCheckpointMutationError = ErrorType<unknown>
+    export type CreatePatrolCheckpointMutationVariables = {data: BodyType<PatrolCheckpointInput>}
+
+    /**
+ * @summary Configure a QR patrol checkpoint
+ */
+export const useCreatePatrolCheckpoint = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPatrolCheckpoint>>, TError,CreatePatrolCheckpointMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createPatrolCheckpoint>>,
+        TError,
+        CreatePatrolCheckpointMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreatePatrolCheckpointMutationOptions(options));
+    }
+
+export const getRecordPatrolScanUrl = () => {
+
+
+
+
+  return `/api/patrol/scans`
+}
+
+/**
+ * @summary Record a QR checkpoint scan
+ */
+export const recordPatrolScan = async (patrolScanInput: PatrolScanInput, options?: Parameters<typeof customFetch>[1]): Promise<PatrolScan> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<PatrolScan>(getRecordPatrolScanUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(patrolScanInput)
+  }
+);}
+
+
+
+
+
+export const getRecordPatrolScanMutationKey = () => ['recordPatrolScan'] as const;
+
+export const getRecordPatrolScanMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordPatrolScan>>, TError,RecordPatrolScanMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof recordPatrolScan>>, TError,RecordPatrolScanMutationVariables, TContext> => {
+
+const mutationKey = getRecordPatrolScanMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof recordPatrolScan>>, RecordPatrolScanMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  recordPatrolScan(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RecordPatrolScanMutationResult = NonNullable<Awaited<ReturnType<typeof recordPatrolScan>>>
+    export type RecordPatrolScanMutationBody = BodyType<PatrolScanInput>
+    export type RecordPatrolScanMutationError = ErrorType<unknown>
+    export type RecordPatrolScanMutationVariables = {data: BodyType<PatrolScanInput>}
+
+    /**
+ * @summary Record a QR checkpoint scan
+ */
+export const useRecordPatrolScan = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof recordPatrolScan>>, TError,RecordPatrolScanMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof recordPatrolScan>>,
+        TError,
+        RecordPatrolScanMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRecordPatrolScanMutationOptions(options));
+    }
+
+export const getGetPatrolSummaryUrl = () => {
+
+
+
+
+  return `/api/patrol/summary`
+}
+
+/**
+ * @summary Get persisted patrol completion metrics
+ */
+export const getPatrolSummary = async ( options?: Parameters<typeof customFetch>[1]): Promise<PatrolSummary> => {
+
+  return customFetch<PatrolSummary>(getGetPatrolSummaryUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPatrolSummaryQueryKey = () => {
+    return [
+    `/api/patrol/summary`
+    ] as const;
+    }
+
+
+export const getGetPatrolSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getPatrolSummary>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatrolSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPatrolSummaryQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPatrolSummary>>> = ({ signal }) => getPatrolSummary({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPatrolSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPatrolSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getPatrolSummary>>>
+export type GetPatrolSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get persisted patrol completion metrics
+ */
+
+export function useGetPatrolSummary<TData = Awaited<ReturnType<typeof getPatrolSummary>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPatrolSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPatrolSummaryQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetIncidentsUrl = () => {
+
+
+
+
+  return `/api/incidents`
+}
+
+/**
+ * @summary List structured incidents
+ */
+export const getIncidents = async ( options?: Parameters<typeof customFetch>[1]): Promise<Incident[]> => {
+
+  return customFetch<Incident[]>(getGetIncidentsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetIncidentsQueryKey = () => {
+    return [
+    `/api/incidents`
+    ] as const;
+    }
+
+
+export const getGetIncidentsQueryOptions = <TData = Awaited<ReturnType<typeof getIncidents>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIncidents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetIncidentsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getIncidents>>> = ({ signal }) => getIncidents({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getIncidents>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetIncidentsQueryResult = NonNullable<Awaited<ReturnType<typeof getIncidents>>>
+export type GetIncidentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List structured incidents
+ */
+
+export function useGetIncidents<TData = Awaited<ReturnType<typeof getIncidents>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getIncidents>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetIncidentsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateIncidentUrl = () => {
+
+
+
+
+  return `/api/incidents`
+}
+
+/**
+ * @summary Report a structured incident
+ */
+export const createIncident = async (incidentInput: IncidentInput, options?: Parameters<typeof customFetch>[1]): Promise<Incident> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<Incident>(getCreateIncidentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(incidentInput)
+  }
+);}
+
+
+
+
+
+export const getCreateIncidentMutationKey = () => ['createIncident'] as const;
+
+export const getCreateIncidentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createIncident>>, TError,CreateIncidentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createIncident>>, TError,CreateIncidentMutationVariables, TContext> => {
+
+const mutationKey = getCreateIncidentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createIncident>>, CreateIncidentMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createIncident(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateIncidentMutationResult = NonNullable<Awaited<ReturnType<typeof createIncident>>>
+    export type CreateIncidentMutationBody = BodyType<IncidentInput>
+    export type CreateIncidentMutationError = ErrorType<unknown>
+    export type CreateIncidentMutationVariables = {data: BodyType<IncidentInput>}
+
+    /**
+ * @summary Report a structured incident
+ */
+export const useCreateIncident = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createIncident>>, TError,CreateIncidentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createIncident>>,
+        TError,
+        CreateIncidentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateIncidentMutationOptions(options));
+    }
+
+export const getTransitionIncidentUrl = (id: string,) => {
+
+
+
+
+  return `/api/incidents/${id}/status`
+}
+
+/**
+ * @summary Transition an incident through its control-room lifecycle
+ */
+export const transitionIncident = async (id: string,
+    incidentStatusInput: IncidentStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<Incident> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<Incident>(getTransitionIncidentUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(incidentStatusInput)
+  }
+);}
+
+
+
+
+
+export const getTransitionIncidentMutationKey = () => ['transitionIncident'] as const;
+
+export const getTransitionIncidentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionIncident>>, TError,TransitionIncidentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transitionIncident>>, TError,TransitionIncidentMutationVariables, TContext> => {
+
+const mutationKey = getTransitionIncidentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transitionIncident>>, TransitionIncidentMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  transitionIncident(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransitionIncidentMutationResult = NonNullable<Awaited<ReturnType<typeof transitionIncident>>>
+    export type TransitionIncidentMutationBody = BodyType<IncidentStatusInput>
+    export type TransitionIncidentMutationError = ErrorType<unknown>
+    export type TransitionIncidentMutationVariables = {id: string;data: BodyType<IncidentStatusInput>}
+
+    /**
+ * @summary Transition an incident through its control-room lifecycle
+ */
+export const useTransitionIncident = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionIncident>>, TError,TransitionIncidentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transitionIncident>>,
+        TError,
+        TransitionIncidentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTransitionIncidentMutationOptions(options));
+    }
+
+export const getGetTodayRosterUrl = () => {
+
+
+
+
+  return `/api/roster/today`
+}
+
+/**
+ * @summary List today's persisted roster assignments
+ */
+export const getTodayRoster = async ( options?: Parameters<typeof customFetch>[1]): Promise<RosterAssignment[]> => {
+
+  return customFetch<RosterAssignment[]>(getGetTodayRosterUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTodayRosterQueryKey = () => {
+    return [
+    `/api/roster/today`
+    ] as const;
+    }
+
+
+export const getGetTodayRosterQueryOptions = <TData = Awaited<ReturnType<typeof getTodayRoster>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodayRoster>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTodayRosterQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTodayRoster>>> = ({ signal }) => getTodayRoster({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTodayRoster>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTodayRosterQueryResult = NonNullable<Awaited<ReturnType<typeof getTodayRoster>>>
+export type GetTodayRosterQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List today's persisted roster assignments
+ */
+
+export function useGetTodayRoster<TData = Awaited<ReturnType<typeof getTodayRoster>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodayRoster>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTodayRosterQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateRosterAssignmentUrl = () => {
+
+
+
+
+  return `/api/roster/today`
+}
+
+/**
+ * @summary Add an assignment to today's roster
+ */
+export const createRosterAssignment = async (rosterAssignmentInput: RosterAssignmentInput, options?: Parameters<typeof customFetch>[1]): Promise<RosterAssignment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<RosterAssignment>(getCreateRosterAssignmentUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rosterAssignmentInput)
+  }
+);}
+
+
+
+
+
+export const getCreateRosterAssignmentMutationKey = () => ['createRosterAssignment'] as const;
+
+export const getCreateRosterAssignmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRosterAssignment>>, TError,CreateRosterAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createRosterAssignment>>, TError,CreateRosterAssignmentMutationVariables, TContext> => {
+
+const mutationKey = getCreateRosterAssignmentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createRosterAssignment>>, CreateRosterAssignmentMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  createRosterAssignment(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateRosterAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof createRosterAssignment>>>
+    export type CreateRosterAssignmentMutationBody = BodyType<RosterAssignmentInput>
+    export type CreateRosterAssignmentMutationError = ErrorType<unknown>
+    export type CreateRosterAssignmentMutationVariables = {data: BodyType<RosterAssignmentInput>}
+
+    /**
+ * @summary Add an assignment to today's roster
+ */
+export const useCreateRosterAssignment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createRosterAssignment>>, TError,CreateRosterAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createRosterAssignment>>,
+        TError,
+        CreateRosterAssignmentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getCreateRosterAssignmentMutationOptions(options));
+    }
+
+export const getGetComplianceRecordsUrl = () => {
+
+
+
+
+  return `/api/compliance`
+}
+
+/**
+ * @summary List employee compliance records
+ */
+export const getComplianceRecords = async ( options?: Parameters<typeof customFetch>[1]): Promise<ComplianceRecord[]> => {
+
+  return customFetch<ComplianceRecord[]>(getGetComplianceRecordsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetComplianceRecordsQueryKey = () => {
+    return [
+    `/api/compliance`
+    ] as const;
+    }
+
+
+export const getGetComplianceRecordsQueryOptions = <TData = Awaited<ReturnType<typeof getComplianceRecords>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComplianceRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetComplianceRecordsQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getComplianceRecords>>> = ({ signal }) => getComplianceRecords({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getComplianceRecords>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetComplianceRecordsQueryResult = NonNullable<Awaited<ReturnType<typeof getComplianceRecords>>>
+export type GetComplianceRecordsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List employee compliance records
+ */
+
+export function useGetComplianceRecords<TData = Awaited<ReturnType<typeof getComplianceRecords>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getComplianceRecords>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetComplianceRecordsQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetTodayOperationalReportUrl = () => {
+
+
+
+
+  return `/api/reports/today`
+}
+
+/**
+ * @summary Get today's persisted Daily Activity Report
+ */
+export const getTodayOperationalReport = async ( options?: Parameters<typeof customFetch>[1]): Promise<OperationalReport> => {
+
+  return customFetch<OperationalReport>(getGetTodayOperationalReportUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetTodayOperationalReportQueryKey = () => {
+    return [
+    `/api/reports/today`
+    ] as const;
+    }
+
+
+export const getGetTodayOperationalReportQueryOptions = <TData = Awaited<ReturnType<typeof getTodayOperationalReport>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodayOperationalReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetTodayOperationalReportQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getTodayOperationalReport>>> = ({ signal }) => getTodayOperationalReport({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getTodayOperationalReport>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetTodayOperationalReportQueryResult = NonNullable<Awaited<ReturnType<typeof getTodayOperationalReport>>>
+export type GetTodayOperationalReportQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get today's persisted Daily Activity Report
+ */
+
+export function useGetTodayOperationalReport<TData = Awaited<ReturnType<typeof getTodayOperationalReport>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getTodayOperationalReport>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetTodayOperationalReportQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSubmitTodayOperationalReportUrl = () => {
+
+
+
+
+  return `/api/reports/today`
+}
+
+/**
+ * @summary Submit or update today's Daily Activity Report
+ */
+export const submitTodayOperationalReport = async (operationalReportInput: OperationalReportInput, options?: Parameters<typeof customFetch>[1]): Promise<OperationalReport> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<OperationalReport>(getSubmitTodayOperationalReportUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(operationalReportInput)
+  }
+);}
+
+
+
+
+
+export const getSubmitTodayOperationalReportMutationKey = () => ['submitTodayOperationalReport'] as const;
+
+export const getSubmitTodayOperationalReportMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitTodayOperationalReport>>, TError,SubmitTodayOperationalReportMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitTodayOperationalReport>>, TError,SubmitTodayOperationalReportMutationVariables, TContext> => {
+
+const mutationKey = getSubmitTodayOperationalReportMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitTodayOperationalReport>>, SubmitTodayOperationalReportMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  submitTodayOperationalReport(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SubmitTodayOperationalReportMutationResult = NonNullable<Awaited<ReturnType<typeof submitTodayOperationalReport>>>
+    export type SubmitTodayOperationalReportMutationBody = BodyType<OperationalReportInput>
+    export type SubmitTodayOperationalReportMutationError = ErrorType<unknown>
+    export type SubmitTodayOperationalReportMutationVariables = {data: BodyType<OperationalReportInput>}
+
+    /**
+ * @summary Submit or update today's Daily Activity Report
+ */
+export const useSubmitTodayOperationalReport = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitTodayOperationalReport>>, TError,SubmitTodayOperationalReportMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof submitTodayOperationalReport>>,
+        TError,
+        SubmitTodayOperationalReportMutationVariables,
+        TContext
+      > => {
+      return useMutation(getSubmitTodayOperationalReportMutationOptions(options));
+    }
+
+export const getTransitionRequestUrl = (id: string,) => {
+
+
+
+
+  return `/api/requests/${id}/status`
+}
+
+/**
+ * @summary Approve or reject an employee request
+ */
+export const transitionRequest = async (id: string,
+    requestStatusInput: RequestStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<RequestRecord> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<RequestRecord>(getTransitionRequestUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(requestStatusInput)
+  }
+);}
+
+
+
+
+
+export const getTransitionRequestMutationKey = () => ['transitionRequest'] as const;
+
+export const getTransitionRequestMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionRequest>>, TError,TransitionRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transitionRequest>>, TError,TransitionRequestMutationVariables, TContext> => {
+
+const mutationKey = getTransitionRequestMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transitionRequest>>, TransitionRequestMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  transitionRequest(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransitionRequestMutationResult = NonNullable<Awaited<ReturnType<typeof transitionRequest>>>
+    export type TransitionRequestMutationBody = BodyType<RequestStatusInput>
+    export type TransitionRequestMutationError = ErrorType<unknown>
+    export type TransitionRequestMutationVariables = {id: string;data: BodyType<RequestStatusInput>}
+
+    /**
+ * @summary Approve or reject an employee request
+ */
+export const useTransitionRequest = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionRequest>>, TError,TransitionRequestMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transitionRequest>>,
+        TError,
+        TransitionRequestMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTransitionRequestMutationOptions(options));
+    }
+
+export const getRequestEvidenceUploadUrlUrl = () => {
+
+
+
+
+  return `/api/storage/uploads/request-url`
+}
+
+/**
+ * @summary Create a short-lived private evidence upload URL
+ */
+export const requestEvidenceUploadUrl = async (evidenceUploadInput: EvidenceUploadInput, options?: Parameters<typeof customFetch>[1]): Promise<EvidenceUpload> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<EvidenceUpload>(getRequestEvidenceUploadUrlUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(evidenceUploadInput)
+  }
+);}
+
+
+
+
+
+export const getRequestEvidenceUploadUrlMutationKey = () => ['requestEvidenceUploadUrl'] as const;
+
+export const getRequestEvidenceUploadUrlMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestEvidenceUploadUrl>>, TError,RequestEvidenceUploadUrlMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof requestEvidenceUploadUrl>>, TError,RequestEvidenceUploadUrlMutationVariables, TContext> => {
+
+const mutationKey = getRequestEvidenceUploadUrlMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof requestEvidenceUploadUrl>>, RequestEvidenceUploadUrlMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  requestEvidenceUploadUrl(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RequestEvidenceUploadUrlMutationResult = NonNullable<Awaited<ReturnType<typeof requestEvidenceUploadUrl>>>
+    export type RequestEvidenceUploadUrlMutationBody = BodyType<EvidenceUploadInput>
+    export type RequestEvidenceUploadUrlMutationError = ErrorType<unknown>
+    export type RequestEvidenceUploadUrlMutationVariables = {data: BodyType<EvidenceUploadInput>}
+
+    /**
+ * @summary Create a short-lived private evidence upload URL
+ */
+export const useRequestEvidenceUploadUrl = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof requestEvidenceUploadUrl>>, TError,RequestEvidenceUploadUrlMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof requestEvidenceUploadUrl>>,
+        TError,
+        RequestEvidenceUploadUrlMutationVariables,
+        TContext
+      > => {
+      return useMutation(getRequestEvidenceUploadUrlMutationOptions(options));
+    }
 
 export const getGetEmployeeSubmissionsUrl = (params?: GetEmployeeSubmissionsParams,) => {
   const normalizedParams = new URLSearchParams();

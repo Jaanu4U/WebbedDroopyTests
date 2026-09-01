@@ -17,6 +17,14 @@ export interface AttendanceRecord {
   /** @nullable */
   punchOut: string | null;
   geofence: string;
+  /** @nullable */
+  punchInVerification: string | null;
+  /** @nullable */
+  punchOutVerification: string | null;
+  /** @nullable */
+  punchInAccuracyMeters?: number | null;
+  /** @nullable */
+  punchOutAccuracyMeters?: number | null;
   siteAddress: string;
   geofenceRadiusMeters: number;
   shiftWindow: string;

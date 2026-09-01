@@ -6,9 +6,26 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { AttendancePunchInputAction } from './attendancePunchInputAction';
+import type { AttendancePunchInputSource } from './attendancePunchInputSource';
 
 export interface AttendancePunchInput {
   action: AttendancePunchInputAction;
   location: string;
   geofenceVerified?: boolean;
+  /**
+     * @minimum -90
+     * @maximum 90
+     */
+  latitude?: number;
+  /**
+     * @minimum -180
+     * @maximum 180
+     */
+  longitude?: number;
+  /** @minimum 0 */
+  accuracyMeters?: number;
+  capturedAt?: Date;
+  source?: AttendancePunchInputSource;
+  /** @minLength 8 */
+  idempotencyKey?: string;
 }

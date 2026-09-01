@@ -18,6 +18,8 @@ import {
   Building,
   Calendar,
   Lock,
+  Camera as CameraIcon,
+  Navigation,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -29,6 +31,15 @@ import {
   useCreateWorkforceItem,
   useUpdateWorkforceItem,
   useTransitionWorkforceItem,
+  useGetIncidents,
+  useCreateIncident,
+  useTransitionIncident,
+  useGetPatrolCheckpoints,
+  useGetPatrolSummary,
+  useRecordPatrolScan,
+  useGetTodayRoster,
+  useGetComplianceRecords,
+  useGetTodayOperationalReport,
   WorkforceItem,
   AuditEvent,
 } from '@workspace/api-client-react';
@@ -421,6 +432,104 @@ function ItemCard({ item, readOnly }: { item: WorkforceItem; readOnly: boolean }
   );
 }
 
+function LiveControls({ readOnly }: { readOnly: boolean }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const incidents = useGetIncidents();
+  const createIncident = useCreateIncident();
+  const transitionIncident = useTransitionIncident();
+  const checkpoints = useGetPatrolCheckpoints();
+  const patrolSummary = useGetPatrolSummary();
+  const recordScan = useRecordPatrolScan();
+  const roster = useGetTodayRoster();
+  const compliance = useGetComplianceRecords();
+  const report = useGetTodayOperationalReport();
+  const [scanToken, setScanToken] = useState('');
+  const [roundId, setRoundId] = useState(`round-${new Date().toISOString().slice(0, 10)}`);
+  const [incident, setIncident] = useState({ category: 'Safety', severity: 'Medium', title: '', narrative: '' });
+  const [evidencePath, setEvidencePath] = useState('');
+
+  const uploadEvidence = async (file: File) => {
+    const response = await fetch('/api/storage/uploads/request-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type || 'image/jpeg' }),
+    });
+    if (!response.ok) throw new Error('Could not reserve secure evidence storage');
+    const upload = await response.json() as { uploadURL: string; objectPath: string };
+    const put = await fetch(upload.uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type || 'image/jpeg' } });
+    if (!put.ok) throw new Error('Evidence upload failed');
+    setEvidencePath(upload.objectPath);
+    toast({ title: 'Evidence uploaded', description: 'The secure object reference is ready to attach to an operation.' });
+  };
+
+  const submitIncident = (event: React.FormEvent) => {
+    event.preventDefault();
+    createIncident.mutate({
+      data: {
+        category: incident.category,
+        severity: incident.severity as 'Low' | 'Medium' | 'High' | 'Critical',
+        title: incident.title,
+        narrative: incident.narrative,
+        affectedPeople: [],
+        affectedAssets: [],
+      },
+    }, {
+      onSuccess: () => {
+        setIncident({ category: 'Safety', severity: 'Medium', title: '', narrative: '' });
+        queryClient.invalidateQueries({ queryKey: ['/api/incidents'] });
+        toast({ title: 'Incident submitted', description: 'Control Room can now acknowledge, assign, contain and close it.' });
+      },
+      onError: () => toast({ title: 'Incident submission failed', variant: 'destructive' }),
+    });
+  };
+
+  const scanCheckpoint = (event: React.FormEvent) => {
+    event.preventDefault();
+    recordScan.mutate({
+      data: {
+        checkpointToken: scanToken,
+        roundId,
+        note: evidencePath ? `Evidence: ${evidencePath}` : undefined,
+        evidence: evidencePath ? { objectPath: evidencePath, captureMode: 'camera' } : undefined,
+      },
+    }, {
+      onSuccess: (result) => {
+        setScanToken('');
+        queryClient.invalidateQueries({ queryKey: ['/api/patrol'] });
+        toast({ title: `Checkpoint ${result.status.toLowerCase()}`, description: result.note ?? 'Patrol scan recorded.' });
+      },
+      onError: () => toast({ title: 'Checkpoint not accepted', description: 'Check the QR token, round sequence and site location.', variant: 'destructive' }),
+    });
+  };
+
+  return <div className="mb-8 grid gap-4 xl:grid-cols-3">
+    {!readOnly && <div className="card-surface p-5 xl:col-span-2">
+      <div className="flex items-start justify-between gap-4">
+        <div><div className="eyebrow mb-2">Control Room / incident command</div><h2 className="section-title">Structured incident queue</h2></div>
+        <span className="status-pill status-warn">{incidents.data?.length ?? 0} live</span>
+      </div>
+      <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={submitIncident}>
+        <input className="field" placeholder="Incident title" required value={incident.title} onChange={(event) => setIncident({ ...incident, title: event.target.value })} />
+        <select className="field" value={incident.severity} onChange={(event) => setIncident({ ...incident, severity: event.target.value })}><option>Low</option><option>Medium</option><option>High</option><option>Critical</option></select>
+        <select className="field" value={incident.category} onChange={(event) => setIncident({ ...incident, category: event.target.value })}><option>Safety</option><option>Security</option><option>Medical</option><option>Asset</option><option>Attendance</option></select>
+        <input className="field" placeholder="Narrative and immediate action" required value={incident.narrative} onChange={(event) => setIncident({ ...incident, narrative: event.target.value })} />
+        <button className="btn btn-primary sm:col-span-2" disabled={createIncident.isPending} type="submit"><Siren size={14} />{createIncident.isPending ? 'Submitting…' : 'Submit incident'}</button>
+      </form>
+      <div className="mt-4 space-y-2">{(incidents.data ?? []).slice(0, 4).map((item) => <div key={item.id} className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="flex items-center justify-between gap-3"><div className="text-xs font-bold">{item.title}</div><span className="status-pill status-danger">{item.severity} · {item.status}</span></div><div className="mt-1 text-[10px] text-[hsl(var(--muted-foreground))]">{item.category} · {formatDate(item.reportedAt)}</div>{!readOnly && !['Closed'].includes(item.status) && <div className="mt-2 flex flex-wrap gap-2">{item.status === 'Submitted' && <Button size="sm" className="h-7 text-xs" onClick={() => transitionIncident.mutate({ id: item.id, data: { status: 'Acknowledged' } })}>Acknowledge</Button>}{item.status === 'Acknowledged' && <Button size="sm" className="h-7 text-xs" onClick={() => transitionIncident.mutate({ id: item.id, data: { status: 'Assigned' } })}>Assign</Button>}{item.status === 'Assigned' && <Button size="sm" className="h-7 text-xs" onClick={() => transitionIncident.mutate({ id: item.id, data: { status: 'In Progress' } })}>Start work</Button>}<Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => transitionIncident.mutate({ id: item.id, data: { status: 'Closed' } })}>Close</Button></div>}</div>)}</div>
+    </div>}
+    {!readOnly && <div className="card-surface p-5">
+      <div className="eyebrow mb-2">Patrol / QR checkpoints</div><h2 className="section-title">Scan a round</h2>
+      <div className="mt-3 grid grid-cols-2 gap-2 text-xs"><div className="rounded-lg bg-[hsl(var(--muted))] p-3"><span className="font-bold">{patrolSummary.data?.completionPercent ?? 0}%</span><span className="ml-1 text-[hsl(var(--muted-foreground))]">verified</span></div><div className="rounded-lg bg-[hsl(var(--muted))] p-3"><span className="font-bold">{checkpoints.data?.length ?? 0}</span><span className="ml-1 text-[hsl(var(--muted-foreground))]">checkpoints</span></div></div>
+      <form className="mt-4 space-y-3" onSubmit={scanCheckpoint}><input className="field" placeholder="Scan or enter QR token" required value={scanToken} onChange={(event) => setScanToken(event.target.value)} /><input className="field" placeholder="Round ID" required value={roundId} onChange={(event) => setRoundId(event.target.value)} /><label className="flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-[hsl(var(--border))] p-3 text-[10px] text-[hsl(var(--muted-foreground))]"><CameraIcon />Live evidence (camera required)<input className="sr-only" type="file" accept="image/*" capture="environment" onChange={(event) => event.target.files?.[0] && uploadEvidence(event.target.files[0]).catch(() => toast({ title: 'Evidence upload failed', variant: 'destructive' }))} /></label><button className="btn btn-primary w-full" disabled={recordScan.isPending} type="submit"><Navigation size={14} />{recordScan.isPending ? 'Recording…' : 'Record checkpoint'}</button></form>
+    </div>}
+    <div className="card-surface p-5 xl:col-span-3">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="eyebrow mb-2">Workforce governance</div><h2 className="section-title">Roster, compliance and reporting state</h2></div><span className="text-[10px] text-[hsl(var(--muted-foreground))]">All values are persisted</span></div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Today’s roster</div><div className="mt-2 text-2xl font-bold">{roster.data?.length ?? 0}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">assignments</div></div><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Compliance records</div><div className="mt-2 text-2xl font-bold">{compliance.data?.length ?? 0}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">expiry tracked</div></div><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Daily report</div><div className="mt-2 text-sm font-bold">{report.data?.status ?? 'Not submitted'}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">approval handoff state</div></div></div>
+    </div>
+  </div>;
+}
+
 export function WorkforceWorkbenchPage({ readOnly = false }: { readOnly?: boolean }) {
   const [filterKind, setFilterKind] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -509,6 +618,8 @@ export function WorkforceWorkbenchPage({ readOnly = false }: { readOnly?: boolea
           </div>
         </div>
       )}
+
+      <LiveControls readOnly={readOnly} />
 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Main Feed Column */}
