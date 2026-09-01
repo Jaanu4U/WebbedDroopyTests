@@ -9,6 +9,8 @@
 export * from './activity';
 export * from './approvalRules';
 export * from './attendanceCorrection';
+export * from './attendanceCorrectionDecisionInput';
+export * from './attendanceCorrectionDecisionInputDecision';
 export * from './attendanceCorrectionInput';
 export * from './attendanceCorrectionInputAction';
 export * from './attendanceCorrectionInputEvidence';
@@ -73,6 +75,8 @@ export * from './requestStatusInput';
 export * from './requestStatusInputStatus';
 export * from './rosterAssignment';
 export * from './rosterAssignmentInput';
+export * from './rosterStatusInput';
+export * from './rosterStatusInputAction';
 export * from './salaryAdvanceInput';
 export * from './shiftRule';
 export * from './siteReport';

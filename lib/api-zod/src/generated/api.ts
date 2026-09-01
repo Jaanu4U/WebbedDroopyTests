@@ -561,7 +561,36 @@ export const RequestAttendanceCorrectionResponse = zod.object({
   "status": zod.string(),
   "reason": zod.string(),
   "requestedBy": zod.string(),
-  "requestedAt": zod.string()
+  "requestedAt": zod.string(),
+  "decision": zod.string().nullish(),
+  "decisionBy": zod.string().nullish(),
+  "decisionAt": zod.string().nullish()
+})
+
+
+/**
+ * @summary Approve or reject an attendance correction
+ */
+export const DecideAttendanceCorrectionParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const DecideAttendanceCorrectionBody = zod.object({
+  "decision": zod.enum(['approved', 'rejected']),
+  "note": zod.string().optional()
+})
+
+export const DecideAttendanceCorrectionResponse = zod.object({
+  "id": zod.string(),
+  "attendanceId": zod.string(),
+  "action": zod.string(),
+  "status": zod.string(),
+  "reason": zod.string(),
+  "requestedBy": zod.string(),
+  "requestedAt": zod.string(),
+  "decision": zod.string().nullish(),
+  "decisionBy": zod.string().nullish(),
+  "decisionAt": zod.string().nullish()
 })
 
 
@@ -908,6 +937,33 @@ export const CreateRosterAssignmentBody = zod.object({
 })
 
 export const CreateRosterAssignmentResponse = zod.object({
+  "id": zod.string(),
+  "employeeId": zod.string(),
+  "employeeName": zod.string(),
+  "site": zod.string(),
+  "post": zod.string(),
+  "shift": zod.string(),
+  "rosterDate": zod.string(),
+  "status": zod.string(),
+  "acknowledgedAt": zod.string().nullish(),
+  "replacementFor": zod.string().nullish(),
+  "lockedAt": zod.string().nullish(),
+  "conflictReason": zod.string().nullish()
+})
+
+
+/**
+ * @summary Acknowledge, approve, reject, or lock a roster assignment
+ */
+export const TransitionRosterAssignmentParams = zod.object({
+  "id": zod.coerce.string()
+})
+
+export const TransitionRosterAssignmentBody = zod.object({
+  "action": zod.enum(['acknowledge', 'approve_replacement', 'reject_replacement', 'lock'])
+})
+
+export const TransitionRosterAssignmentResponse = zod.object({
   "id": zod.string(),
   "employeeId": zod.string(),
   "employeeName": zod.string(),

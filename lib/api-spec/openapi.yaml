@@ -321,6 +321,26 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AttendanceCorrection"
+  /attendance/corrections/{id}/decision:
+    patch:
+      operationId: decideAttendanceCorrection
+      tags: [operations]
+      summary: Approve or reject an attendance correction
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttendanceCorrectionDecisionInput"
+      responses:
+        "200":
+          description: Decided attendance correction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceCorrection"
   /team/guards:
     get:
       operationId: getTeamGuards
@@ -571,6 +591,26 @@ paths:
       responses:
         "201":
           description: Created roster assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RosterAssignment"
+  /roster/{id}/status:
+    patch:
+      operationId: transitionRosterAssignment
+      tags: [operations]
+      summary: Acknowledge, approve, reject, or lock a roster assignment
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RosterStatusInput"
+      responses:
+        "200":
+          description: Updated roster assignment
           content:
             application/json:
               schema:
@@ -1022,6 +1062,17 @@ components:
         reason: { type: string }
         requestedBy: { type: string }
         requestedAt: { type: string }
+        decision: { type: ["string", "null"] }
+        decisionBy: { type: ["string", "null"] }
+        decisionAt: { type: ["string", "null"] }
+    AttendanceCorrectionDecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approved, rejected]
+        note: { type: string }
     SosInput:
       type: object
       required: [employeeName, location]
@@ -1272,6 +1323,13 @@ components:
         replacementFor: { type: ["string", "null"] }
         lockedAt: { type: ["string", "null"] }
         conflictReason: { type: ["string", "null"] }
+    RosterStatusInput:
+      type: object
+      required: [action]
+      properties:
+        action:
+          type: string
+          enum: [acknowledge, approve_replacement, reject_replacement, lock]
     ComplianceRecord:
       type: object
       required: [id, employeeId, employeeName, kind, status]

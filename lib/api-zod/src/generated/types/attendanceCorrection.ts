@@ -14,4 +14,10 @@ export interface AttendanceCorrection {
   reason: string;
   requestedBy: string;
   requestedAt: string;
+  /** @nullable */
+  decision?: string | null;
+  /** @nullable */
+  decisionBy?: string | null;
+  /** @nullable */
+  decisionAt?: string | null;
 }

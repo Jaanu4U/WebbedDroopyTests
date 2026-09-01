@@ -22,6 +22,7 @@ import type {
 import type {
   Activity,
   AttendanceCorrection,
+  AttendanceCorrectionDecisionInput,
   AttendanceCorrectionInput,
   AttendancePunchInput,
   AttendanceRecord,
@@ -68,6 +69,7 @@ import type {
   RequestStatusInput,
   RosterAssignment,
   RosterAssignmentInput,
+  RosterStatusInput,
   SalaryAdvanceInput,
   SiteReport,
   SosAlert,
@@ -1533,6 +1535,87 @@ export const useRequestAttendanceCorrection = <TError = ErrorType<unknown>,
       return useMutation(getRequestAttendanceCorrectionMutationOptions(options));
     }
 
+export const getDecideAttendanceCorrectionUrl = (id: string,) => {
+
+
+
+
+  return `/api/attendance/corrections/${id}/decision`
+}
+
+/**
+ * @summary Approve or reject an attendance correction
+ */
+export const decideAttendanceCorrection = async (id: string,
+    attendanceCorrectionDecisionInput: AttendanceCorrectionDecisionInput, options?: Parameters<typeof customFetch>[1]): Promise<AttendanceCorrection> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<AttendanceCorrection>(getDecideAttendanceCorrectionUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(attendanceCorrectionDecisionInput)
+  }
+);}
+
+
+
+
+
+export const getDecideAttendanceCorrectionMutationKey = () => ['decideAttendanceCorrection'] as const;
+
+export const getDecideAttendanceCorrectionMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideAttendanceCorrection>>, TError,DecideAttendanceCorrectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof decideAttendanceCorrection>>, TError,DecideAttendanceCorrectionMutationVariables, TContext> => {
+
+const mutationKey = getDecideAttendanceCorrectionMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof decideAttendanceCorrection>>, DecideAttendanceCorrectionMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  decideAttendanceCorrection(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DecideAttendanceCorrectionMutationResult = NonNullable<Awaited<ReturnType<typeof decideAttendanceCorrection>>>
+    export type DecideAttendanceCorrectionMutationBody = BodyType<AttendanceCorrectionDecisionInput>
+    export type DecideAttendanceCorrectionMutationError = ErrorType<unknown>
+    export type DecideAttendanceCorrectionMutationVariables = {id: string;data: BodyType<AttendanceCorrectionDecisionInput>}
+
+    /**
+ * @summary Approve or reject an attendance correction
+ */
+export const useDecideAttendanceCorrection = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof decideAttendanceCorrection>>, TError,DecideAttendanceCorrectionMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof decideAttendanceCorrection>>,
+        TError,
+        DecideAttendanceCorrectionMutationVariables,
+        TContext
+      > => {
+      return useMutation(getDecideAttendanceCorrectionMutationOptions(options));
+    }
+
 export const getGetTeamGuardsUrl = () => {
 
 
@@ -2787,6 +2870,87 @@ export const useCreateRosterAssignment = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getCreateRosterAssignmentMutationOptions(options));
+    }
+
+export const getTransitionRosterAssignmentUrl = (id: string,) => {
+
+
+
+
+  return `/api/roster/${id}/status`
+}
+
+/**
+ * @summary Acknowledge, approve, reject, or lock a roster assignment
+ */
+export const transitionRosterAssignment = async (id: string,
+    rosterStatusInput: RosterStatusInput, options?: Parameters<typeof customFetch>[1]): Promise<RosterAssignment> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Array.isArray(h)) return Object.fromEntries(h);
+    return h;
+  };
+return customFetch<RosterAssignment>(getTransitionRosterAssignmentUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rosterStatusInput)
+  }
+);}
+
+
+
+
+
+export const getTransitionRosterAssignmentMutationKey = () => ['transitionRosterAssignment'] as const;
+
+export const getTransitionRosterAssignmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionRosterAssignment>>, TError,TransitionRosterAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transitionRosterAssignment>>, TError,TransitionRosterAssignmentMutationVariables, TContext> => {
+
+const mutationKey = getTransitionRosterAssignmentMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transitionRosterAssignment>>, TransitionRosterAssignmentMutationVariables> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  transitionRosterAssignment(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransitionRosterAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof transitionRosterAssignment>>>
+    export type TransitionRosterAssignmentMutationBody = BodyType<RosterStatusInput>
+    export type TransitionRosterAssignmentMutationError = ErrorType<unknown>
+    export type TransitionRosterAssignmentMutationVariables = {id: string;data: BodyType<RosterStatusInput>}
+
+    /**
+ * @summary Acknowledge, approve, reject, or lock a roster assignment
+ */
+export const useTransitionRosterAssignment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transitionRosterAssignment>>, TError,TransitionRosterAssignmentMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transitionRosterAssignment>>,
+        TError,
+        TransitionRosterAssignmentMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTransitionRosterAssignmentMutationOptions(options));
     }
 
 export const getGetComplianceRecordsUrl = () => {

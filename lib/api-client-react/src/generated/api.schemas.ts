@@ -193,6 +193,25 @@ export interface AttendanceCorrection {
   reason: string;
   requestedBy: string;
   requestedAt: string;
+  /** @nullable */
+  decision?: string | null;
+  /** @nullable */
+  decisionBy?: string | null;
+  /** @nullable */
+  decisionAt?: string | null;
+}
+
+export type AttendanceCorrectionDecisionInputDecision = typeof AttendanceCorrectionDecisionInputDecision[keyof typeof AttendanceCorrectionDecisionInputDecision];
+
+
+export const AttendanceCorrectionDecisionInputDecision = {
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface AttendanceCorrectionDecisionInput {
+  decision: AttendanceCorrectionDecisionInputDecision;
+  note?: string;
 }
 
 export interface SosInput {
@@ -497,6 +516,20 @@ export interface RosterAssignment {
   lockedAt?: string | null;
   /** @nullable */
   conflictReason?: string | null;
+}
+
+export type RosterStatusInputAction = typeof RosterStatusInputAction[keyof typeof RosterStatusInputAction];
+
+
+export const RosterStatusInputAction = {
+  acknowledge: 'acknowledge',
+  approve_replacement: 'approve_replacement',
+  reject_replacement: 'reject_replacement',
+  lock: 'lock',
+} as const;
+
+export interface RosterStatusInput {
+  action: RosterStatusInputAction;
 }
 
 export interface ComplianceRecord {

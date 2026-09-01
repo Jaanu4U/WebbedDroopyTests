@@ -1,0 +1,103 @@
+Highest priority
+Real attendance and location validation
+
+Actual GPS coordinates, accuracy, and capture timestamps.
+Server-side site geofence validation.
+City-level geofencing for Field Officers.
+Persisted location heartbeats and stale/offline status.
+Offline attendance synchronization.
+Attendance corrections, late/no-show alerts, and payroll close.
+Current implementation accepts a geofenceVerified flag and stores mostly textual location information.
+Live evidence uploads
+
+Secure App Storage uploads.
+Live camera capture for required activities.
+Block gallery/attachment substitution where live capture is required.
+Attach photos, videos, audio, documents, witnesses, and location data to tasks/incidents/SOS.
+Current workbench only stores evidence references as structured text.
+QR patrol workflows
+
+Configure QR checkpoints.
+Scan checkpoints during patrols.
+Track sequence, patrol rounds, missed checkpoints, and damaged-QR exceptions.
+Include patrol completion in operational metrics.
+There is currently no real QR scanning lifecycle.
+Incident and SOS lifecycle
+
+Structured incidents with category, severity, affected people/assets, and timestamps.
+Incident states: Submitted, Acknowledged, Assigned, In Progress, Contained, Closed, Reopened.
+SOS states: Triggered, Delivered, Acknowledged, Dispatched, Safe/Escalated, Closed.
+SLA timers, escalation, dispatch, corrective actions, communication logs, handovers, and drill mode.
+Current implementation records basic SOS/incident items but does not provide the complete Control Room lifecycle.
+Workforce and compliance
+Actual roster and coverage management
+
+Daily/weekly/monthly rosters by client, site, post, and shift.
+Employee acknowledgement.
+Filled/open/at-risk/no-show/overstaffed coverage states.
+Replacement shortlist and approval workflow.
+Double-booking, overlap, credential-expiry, and roster-lock controls.
+Employee verification and compliance
+
+Full employee database.
+Duplicate detection.
+Required documents and verification queue.
+Deployability rules.
+Credential, training, medical, licence, and ID expiry tracking.
+Authorized overrides with reasons and approvals.
+The current employee submission flow is basic: name, phone, city, note, and Accept/Reject/Send Back.
+Configurable tasks, handovers, and daily reports
+
+Site/post/role/shift checklist configuration.
+Scheduled activities and critical-task alerts.
+Task evidence requirements.
+Shift handover records.
+Automated Daily Activity Report assembled from attendance, coverage, patrols, incidents, and handovers.
+Current checklists and the workbench are functional foundations, but not this complete workflow.
+Finance and reporting
+Leave, salary advance, bills, and payroll controls
+
+Coverage-aware leave approvals.
+Salary advance eligibility, approval, recovery, and status.
+Bill verification, Finance approval/rejection, payment references, and duplicate-bill review.
+Attendance/payroll reconciliation.
+Authoritative payslip governance.
+Current APIs mainly create pending requests and apply basic policy limits.
+Operational dashboards and reporting
+
+Real exception dashboard.
+KPI drill-down to site, shift, employee, and event records.
+Scheduled daily/weekly/monthly reports.
+Standard reports for coverage, attendance, patrols, incidents, SOS, DAR, compliance, leave, bills, payroll, and Field Officer visits.
+Current dashboard/site-report values include seeded or static data in places.
+Control Room command center
+
+Unified event queue.
+Live Field Officer map.
+Location freshness and assignment filters.
+One-action acknowledgement.
+Dispatch and responder assignment.
+Communication log.
+Control Room shift handover.
+Current tracking uses seeded Field Officer records with basic filters rather than live operational data.
+Client portal hardening
+
+A minimal read-only safe-record view exists.
+The PDF describes the full client portal as a future phase, so tenant isolation and approved coverage, patrol, DAR, and incident/SLA views still need to be defined if this phase is required.
+Client decisions still pending
+The PDF marks these as TBC:
+
+Exact shifts, grace periods, breaks, and weekly-rest rules.
+Geofence radius and GPS accuracy requirements.
+Offline attendance policy.
+Supervisor check-in and correction approval rules.
+Activities requiring live evidence.
+Incident categories, severity levels, and SLAs.
+Control Room escalation chain and emergency fallback.
+Field Officer tracking hours and refresh interval.
+Employee fields and required documents.
+Salary advance and bill approval rules.
+Daily Site Report fields and approval cut-off.
+Required field-user languages.
+Compliance records and reminder periods.
+Client-visible portal fields.

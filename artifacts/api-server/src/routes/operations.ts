@@ -50,6 +50,10 @@ import {
   UpdateWorkforceItemBody,
   TransitionWorkforceItemParams,
   TransitionWorkforceItemBody,
+  DecideAttendanceCorrectionBody,
+  DecideAttendanceCorrectionParams,
+  TransitionRosterAssignmentBody,
+  TransitionRosterAssignmentParams,
 } from "@workspace/api-zod";
 import {
   assignmentFromMetadata,
@@ -1793,6 +1797,65 @@ router.post("/attendance/corrections", requireRole("Guard", "Supervisor", "Secur
   });
 });
 
+router.patch("/attendance/corrections/:id/decision", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const { id } = DecideAttendanceCorrectionParams.parse(req.params);
+  const body = DecideAttendanceCorrectionBody.parse(req.body);
+  const [event] = await db.select().from(attendanceEventsTable)
+    .where(eq(attendanceEventsTable.id, id)).limit(1);
+  if (!event || event.status !== "Pending approval") {
+    res.status(404).json({ error: "Pending attendance correction not found" });
+    return;
+  }
+
+  const timestamp = now();
+  const decisionStatus = body.decision === "approved" ? "Approved" : "Rejected";
+  const [updatedEvent] = await db.update(attendanceEventsTable).set({
+    status: decisionStatus,
+    verification: `Correction ${body.decision}`,
+    reason: body.note?.trim() || event.reason,
+    updatedAt: timestamp,
+  }).where(eq(attendanceEventsTable.id, event.id)).returning();
+
+  if (body.decision === "approved") {
+    const correctedAt = event.capturedAt ?? event.receivedAt;
+    await db.update(attendanceRecordsTable).set({
+      ...(event.action === "in"
+        ? { punchInAt: correctedAt, punchInCapturedAt: event.capturedAt ?? correctedAt }
+        : { punchOutAt: correctedAt, punchOutCapturedAt: event.capturedAt ?? correctedAt }),
+      correctionStatus: "Approved",
+      updatedAt: timestamp,
+    }).where(eq(attendanceRecordsTable.id, event.attendanceId));
+  } else {
+    await db.update(attendanceRecordsTable).set({
+      correctionStatus: "Rejected",
+      updatedAt: timestamp,
+    }).where(eq(attendanceRecordsTable.id, event.attendanceId));
+  }
+
+  await db.insert(auditEventsTable).values({
+    id: randomUUID(),
+    entityType: "attendance_correction",
+    entityId: event.id,
+    action: `attendance_correction_${body.decision}`,
+    actorId: operatorFor(req),
+    summary: `Attendance correction ${body.decision}`,
+    metadata: { attendanceId: event.attendanceId, note: body.note ?? null },
+  });
+
+  res.json({
+    id: updatedEvent.id,
+    attendanceId: updatedEvent.attendanceId,
+    action: updatedEvent.action,
+    status: updatedEvent.status,
+    reason: updatedEvent.reason,
+    requestedBy: updatedEvent.actor,
+    requestedAt: updatedEvent.createdAt.toISOString(),
+    decision: body.decision,
+    decisionBy: operatorFor(req),
+    decisionAt: timestamp.toISOString(),
+  });
+});
+
 router.get("/team/guards", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (_req, res) => {
   const records = await db.select().from(guardsTable).orderBy(asc(guardsTable.id));
   res.json(records.map(guardResponse));
@@ -2185,6 +2248,23 @@ router.post("/roster/today", requireRole("Supervisor", "Security Officer", "Mana
     res.status(409).json({ error: "This post and shift already have an assignment.", conflict: rosterResponse(conflict) });
     return;
   }
+  if (conflict?.lockedAt) {
+    res.status(409).json({ error: "This roster assignment is locked and cannot be replaced.", conflict: rosterResponse(conflict) });
+    return;
+  }
+  const [employeeConflict] = await db.select().from(rosterAssignmentsTable)
+    .where(and(
+      eq(rosterAssignmentsTable.rosterDate, rosterDate),
+      eq(rosterAssignmentsTable.employeeId, body.employeeId),
+      eq(rosterAssignmentsTable.shift, body.shift),
+    )).limit(1);
+  if (employeeConflict && employeeConflict.id !== body.replacementFor) {
+    res.status(409).json({
+      error: "This employee is already assigned to another post during this shift.",
+      conflict: rosterResponse(employeeConflict),
+    });
+    return;
+  }
   const [record] = await db.insert(rosterAssignmentsTable).values({
     id: `roster-${randomUUID()}`,
     employeeId: body.employeeId,
@@ -2200,13 +2280,69 @@ router.post("/roster/today", requireRole("Supervisor", "Security Officer", "Mana
   res.status(201).json(rosterResponse(record));
 });
 
+router.patch("/roster/:id/status", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
+  const { id } = TransitionRosterAssignmentParams.parse(req.params);
+  const body = TransitionRosterAssignmentBody.parse(req.body);
+  const [existing] = await db.select().from(rosterAssignmentsTable)
+    .where(eq(rosterAssignmentsTable.id, id)).limit(1);
+  if (!existing) {
+    res.status(404).json({ error: "Roster assignment not found" });
+    return;
+  }
+  if (existing.lockedAt && body.action !== "lock") {
+    res.status(409).json({ error: "This roster assignment is locked." });
+    return;
+  }
+  const timestamp = now();
+  const updates: Partial<typeof rosterAssignmentsTable.$inferInsert> = {};
+  if (body.action === "acknowledge") {
+    updates.status = "Acknowledged";
+    updates.acknowledgedAt = timestamp;
+  } else if (body.action === "approve_replacement") {
+    if (!existing.replacementFor) {
+      res.status(422).json({ error: "Only replacement assignments can be approved." });
+      return;
+    }
+    updates.status = "Published";
+    await db.update(rosterAssignmentsTable).set({
+      status: "Replaced",
+      conflictReason: `Replaced by ${existing.id}`,
+      updatedAt: timestamp,
+    }).where(eq(rosterAssignmentsTable.id, existing.replacementFor));
+  } else if (body.action === "reject_replacement") {
+    if (!existing.replacementFor) {
+      res.status(422).json({ error: "Only replacement assignments can be rejected." });
+      return;
+    }
+    updates.status = "Replacement rejected";
+  } else {
+    updates.status = "Locked";
+    updates.lockedAt = timestamp;
+  }
+  updates.updatedAt = timestamp;
+  const [record] = await db.update(rosterAssignmentsTable).set(updates)
+    .where(eq(rosterAssignmentsTable.id, existing.id)).returning();
+  await db.insert(auditEventsTable).values({
+    id: randomUUID(),
+    entityType: "roster_assignment",
+    entityId: existing.id,
+    action: `roster_${body.action}`,
+    actorId: operatorFor(req),
+    summary: `Roster assignment ${body.action.replaceAll("_", " ")}`,
+  });
+  res.json(rosterResponse(record));
+});
+
 router.get("/compliance", requireRole("Supervisor", "Security Officer", "Management", "Control Room"), async (req, res) => {
   const records = await db.select().from(complianceRecordsTable).orderBy(asc(complianceRecordsTable.expiresAt));
-  res.json(records.filter((record) =>
-    ["Management", "Control Room"].includes(req.workforceAccess?.role ?? "")
-      || record.metadata && (record.metadata.site as string | undefined) === req.workforceAccess?.siteName
-      || true,
-  ).map(complianceResponse));
+  const canViewAllSites = ["Management", "Control Room"].includes(req.workforceAccess?.role ?? "");
+  const siteName = req.workforceAccess?.siteName;
+  res.json(records
+    .filter((record) =>
+      canViewAllSites ||
+      (typeof record.metadata?.site === "string" && record.metadata.site === siteName),
+    )
+    .map(complianceResponse));
 });
 
 router.get("/reports/today", async (req, res) => {

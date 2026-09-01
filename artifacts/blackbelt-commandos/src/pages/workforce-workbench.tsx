@@ -38,6 +38,8 @@ import {
   useGetPatrolSummary,
   useRecordPatrolScan,
   useGetTodayRoster,
+  getGetTodayRosterQueryKey,
+  useTransitionRosterAssignment,
   useGetComplianceRecords,
   useGetTodayOperationalReport,
   WorkforceItem,
@@ -442,6 +444,7 @@ function LiveControls({ readOnly }: { readOnly: boolean }) {
   const patrolSummary = useGetPatrolSummary();
   const recordScan = useRecordPatrolScan();
   const roster = useGetTodayRoster();
+  const transitionRoster = useTransitionRosterAssignment();
   const compliance = useGetComplianceRecords();
   const report = useGetTodayOperationalReport();
   const [scanToken, setScanToken] = useState('');
@@ -525,7 +528,7 @@ function LiveControls({ readOnly }: { readOnly: boolean }) {
     </div>}
     <div className="card-surface p-5 xl:col-span-3">
       <div className="flex flex-wrap items-center justify-between gap-3"><div><div className="eyebrow mb-2">Workforce governance</div><h2 className="section-title">Roster, compliance and reporting state</h2></div><span className="text-[10px] text-[hsl(var(--muted-foreground))]">All values are persisted</span></div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Today’s roster</div><div className="mt-2 text-2xl font-bold">{roster.data?.length ?? 0}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">assignments</div></div><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Compliance records</div><div className="mt-2 text-2xl font-bold">{compliance.data?.length ?? 0}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">expiry tracked</div></div><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Daily report</div><div className="mt-2 text-sm font-bold">{report.data?.status ?? 'Not submitted'}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">approval handoff state</div></div></div>
+       <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Today’s roster</div><div className="mt-2 text-2xl font-bold">{roster.data?.length ?? 0}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">assignments</div>{!readOnly && (roster.data ?? []).length > 0 && <div className="mt-3 space-y-2">{(roster.data ?? []).slice(0, 3).map((assignment) => <div key={assignment.id} className="rounded-md bg-[hsl(var(--muted))] p-2"><div className="text-[10px] font-bold">{assignment.employeeName} · {assignment.post}</div><div className="mt-1 flex items-center justify-between gap-2"><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{assignment.status}</span>{assignment.status === 'Published' && <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" disabled={transitionRoster.isPending} onClick={() => transitionRoster.mutate({ id: assignment.id, data: { action: 'acknowledge' } }, { onSuccess: () => { queryClient.invalidateQueries({ queryKey: getGetTodayRosterQueryKey() }); toast({ title: 'Roster acknowledged' }); }, onError: () => toast({ title: 'Could not acknowledge roster', variant: 'destructive' }) })}>Acknowledge</Button>}</div></div>)}</div>}</div><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Compliance records</div><div className="mt-2 text-2xl font-bold">{compliance.data?.length ?? 0}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">expiry tracked</div></div><div className="rounded-lg border border-[hsl(var(--border))] p-3"><div className="field-label">Daily report</div><div className="mt-2 text-sm font-bold">{report.data?.status ?? 'Not submitted'}</div><div className="text-[10px] text-[hsl(var(--muted-foreground))]">approval handoff state</div></div></div>
     </div>
   </div>;
 }
