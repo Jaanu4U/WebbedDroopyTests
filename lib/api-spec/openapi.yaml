@@ -1,0 +1,909 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: BlackBelt Commandos workforce operations API
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: operations
+    description: Workforce operations
+  - name: requests
+    description: Employee requests
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /session:
+    get:
+      operationId: getWorkforceSession
+      tags: [operations]
+      summary: Get the signed-in user's workforce access
+      responses:
+        "200":
+          description: Authenticated role and assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkforceSession"
+  /admin/field-officers:
+    get:
+      operationId: getAdminFieldOfficers
+      tags: [operations]
+      summary: Get field officer records available for access assignment
+      responses:
+        "200":
+          description: Field officer records
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FieldOfficerRecord"
+  /admin/workforce-users:
+    get:
+      operationId: getAdminWorkforceUsers
+      tags: [operations]
+      summary: Find Clerk users and their workforce assignments
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Clerk users with workforce assignments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/WorkforceUser"
+  /admin/workforce-users/{userId}/assignment:
+    patch:
+      operationId: updateAdminWorkforceUserAssignment
+      tags: [operations]
+      summary: Assign a workforce role and site to a Clerk user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WorkforceUserAssignment"
+      responses:
+        "200":
+          description: Updated workforce assignment
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkforceUser"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [operations]
+      summary: Get operations dashboard summary
+      responses:
+        "200":
+          description: Dashboard metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /policies/operating:
+    get:
+      operationId: getOperatingPolicy
+      tags: [operations]
+      summary: Get the active operating policy
+      responses:
+        "200":
+          description: Active site and workforce operating rules
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatingPolicy"
+    patch:
+      operationId: updateOperatingPolicy
+      tags: [operations]
+      summary: Update the active operating policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OperatingPolicyUpdate"
+      responses:
+        "200":
+          description: Updated operating policy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatingPolicy"
+        "409":
+          description: The policy was changed after the submitted version was loaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperatingPolicyConflict"
+  /policies/operating/revisions:
+    get:
+      operationId: getOperatingPolicyRevisions
+      tags: [operations]
+      summary: Get a page of operating policy revisions
+      parameters:
+        - name: offset
+          in: query
+          description: Number of newest revisions to skip
+          schema:
+            type: number
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          description: Maximum revisions to return
+          schema:
+            type: number
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: Policy revisions ordered newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OperatingPolicyRevision"
+  /policies/operating/revisions/{revisionId}/export:
+    get:
+      operationId: exportOperatingPolicyRevision
+      tags: [operations]
+      summary: Export an operating policy revision comparison
+      parameters:
+        - name: revisionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Readable policy revision comparison
+          content:
+            text/plain:
+              schema:
+                type: string
+  /activity:
+    get:
+      operationId: getActivity
+      tags: [operations]
+      summary: Get recent activity
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Activity"
+  /attendance/today:
+    get:
+      operationId: getTodayAttendance
+      tags: [operations]
+      summary: Get today's attendance record
+      responses:
+        "200":
+          description: Attendance record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+  /attendance/punch:
+    post:
+      operationId: punchAttendance
+      tags: [operations]
+      summary: Punch in or out with geofence context
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttendancePunchInput"
+      responses:
+        "200":
+          description: Updated attendance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttendanceRecord"
+  /emergency/sos:
+    get:
+      operationId: getSosAlerts
+      tags: [operations]
+      summary: List recorded SOS alerts
+      responses:
+        "200":
+          description: Recorded SOS alerts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SosAlert"
+    post:
+      operationId: triggerSos
+      tags: [operations]
+      summary: Trigger an SOS alert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SosInput"
+      responses:
+        "201":
+          description: SOS alert created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SosAlert"
+  /team/guards:
+    get:
+      operationId: getTeamGuards
+      tags: [operations]
+      summary: List reporting guards
+      responses:
+        "200":
+          description: Reporting guards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Guard"
+  /team/guards/{id}/check-in:
+    post:
+      operationId: checkInGuard
+      tags: [operations]
+      summary: Check in a reporting guard
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      responses:
+        "200":
+          description: Updated guard
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Guard"
+  /checklist/today:
+    get:
+      operationId: getTodayChecklist
+      tags: [operations]
+      summary: Get today's checklist
+      responses:
+        "200":
+          description: Checklist
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChecklistItem"
+  /checklist/{id}:
+    patch:
+      operationId: updateChecklistItem
+      tags: [operations]
+      summary: Update a checklist item
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChecklistUpdate"
+      responses:
+        "200":
+          description: Updated checklist item
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChecklistItem"
+  /contacts:
+    get:
+      operationId: getEscalationContacts
+      tags: [operations]
+      summary: Get escalation contacts
+      responses:
+        "200":
+          description: Escalation contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EscalationContact"
+  /site-report/today:
+    get:
+      operationId: getTodaySiteReport
+      tags: [operations]
+      summary: Get today's site report
+      responses:
+        "200":
+          description: Site report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SiteReport"
+  /tracking/field-officers:
+    get:
+      operationId: getFieldOfficerTracking
+      tags: [operations]
+      summary: Get live field officer locations
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: dutyStatus
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Field officer locations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FieldOfficerLocation"
+  /employee-submissions:
+    get:
+      operationId: getEmployeeSubmissions
+      tags: [operations]
+      summary: Get employee verification submissions
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Employee submissions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/EmployeeSubmission"
+    post:
+      operationId: submitEmployeeDetails
+      tags: [operations]
+      summary: Submit employee details for review
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmployeeSubmissionInput"
+      responses:
+        "201":
+          description: Submitted employee record
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSubmission"
+  /employee-submissions/{id}/decision:
+    patch:
+      operationId: decideEmployeeSubmission
+      tags: [operations]
+      summary: Accept, reject, or send back an employee submission
+      parameters:
+        - $ref: "#/components/parameters/Id"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmployeeDecisionInput"
+      responses:
+        "200":
+          description: Updated submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmployeeSubmission"
+  /payslips:
+    get:
+      operationId: getPayslips
+      tags: [operations]
+      summary: Get available payslips
+      responses:
+        "200":
+          description: Payslips
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Payslip"
+  /requests:
+    get:
+      operationId: getRequests
+      tags: [requests]
+      summary: List submitted employee requests
+      responses:
+        "200":
+          description: Submitted requests
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RequestRecord"
+  /requests/leave:
+    post:
+      operationId: createLeaveRequest
+      tags: [requests]
+      summary: Submit a leave request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeaveRequestInput"
+      responses:
+        "201":
+          description: Leave request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestRecord"
+  /requests/salary-advance:
+    post:
+      operationId: createSalaryAdvanceRequest
+      tags: [requests]
+      summary: Submit a salary advance request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SalaryAdvanceInput"
+      responses:
+        "201":
+          description: Salary advance request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestRecord"
+  /requests/bills:
+    post:
+      operationId: createBillSubmission
+      tags: [requests]
+      summary: Submit a field bill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BillSubmissionInput"
+      responses:
+        "201":
+          description: Bill submission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RequestRecord"
+components:
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+    DashboardSummary:
+      type: object
+      required: [coverage, attendance, patrol, incidents, openApprovals, fieldOfficers]
+      properties:
+        coverage: { type: number }
+        attendance: { type: number }
+        patrol: { type: number }
+        incidents: { type: number }
+        openApprovals: { type: number }
+        fieldOfficers: { type: number }
+    WorkforceSession:
+      type: object
+      required: [userId, role, siteName, fieldOfficerId, permissions]
+      properties:
+        userId: { type: string }
+        role:
+          type: string
+          enum: [Guard, Supervisor, Security Officer, Field Officer, Management, Control Room]
+        siteName: { type: string }
+        fieldOfficerId: { type: ["string", "null"] }
+        permissions:
+          type: object
+          required: [canViewEmployeeDetails, canViewFieldTracking, canManageTeam, canManagePolicies]
+          properties:
+            canViewEmployeeDetails: { type: boolean }
+            canViewFieldTracking: { type: boolean }
+            canManageTeam: { type: boolean }
+            canManagePolicies: { type: boolean }
+    FieldOfficerRecord:
+      type: object
+      required: [id, name, city, dutyStatus]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        city: { type: string }
+        dutyStatus: { type: string }
+    WorkforceUser:
+      type: object
+      required: [userId, displayName, email, role, siteName, fieldOfficerId, assignmentUpdatedAt, assignmentUpdatedBy]
+      properties:
+        userId: { type: string }
+        displayName: { type: string }
+        email: { type: string, nullable: true }
+        role:
+          type: string
+          enum: [Guard, Supervisor, Security Officer, Field Officer, Management, Control Room]
+        siteName: { type: string }
+        fieldOfficerId: { type: string, nullable: true }
+        assignmentUpdatedAt: { type: string, nullable: true }
+        assignmentUpdatedBy: { type: string, nullable: true }
+    WorkforceUserAssignment:
+      type: object
+      required: [role, siteName]
+      properties:
+        role:
+          type: string
+          enum: [Guard, Supervisor, Security Officer, Field Officer, Management, Control Room]
+        siteName: { type: string, minLength: 1 }
+        fieldOfficerId: { type: string, nullable: true }
+    Activity:
+      type: object
+      required: [id, title, detail, time, tone]
+      properties:
+        id: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        time: { type: string }
+        tone: { type: string }
+    AttendanceRecord:
+      type: object
+      required: [id, employeeName, shift, site, status, punchIn, punchOut, geofence, siteAddress, geofenceRadiusMeters, shiftWindow]
+      properties:
+        id: { type: string }
+        employeeName: { type: string }
+        shift: { type: string }
+        site: { type: string }
+        status: { type: string }
+        punchIn: { type: ["string", "null"] }
+        punchOut: { type: ["string", "null"] }
+        geofence: { type: string }
+        siteAddress: { type: string }
+        geofenceRadiusMeters: { type: number }
+        shiftWindow: { type: string }
+    AttendancePunchInput:
+      type: object
+      required: [action, location]
+      properties:
+        action:
+          type: string
+          enum: [in, out]
+        location: { type: string }
+        geofenceVerified: { type: boolean }
+    SosInput:
+      type: object
+      required: [employeeName, location]
+      properties:
+        employeeName: { type: string }
+        location: { type: string }
+        drill: { type: boolean }
+    SosAlert:
+      type: object
+      required: [id, status, employeeName, location, createdAt, triggeredBy, acknowledgementWindowMinutes, acknowledgementDueAt]
+      properties:
+        id: { type: string }
+        status: { type: string }
+        employeeName: { type: string }
+        location: { type: string }
+        createdAt: { type: string }
+        triggeredBy: { type: string }
+        acknowledgementWindowMinutes: { type: number }
+        acknowledgementDueAt: { type: string }
+    Guard:
+      type: object
+      required: [id, name, role, post, shift, status, lastSeen]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: string }
+        post: { type: string }
+        shift: { type: string }
+        status: { type: string }
+        lastSeen: { type: string }
+    ChecklistItem:
+      type: object
+      required: [id, label, category, required, completed]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        category: { type: string }
+        required: { type: boolean }
+        completed: { type: boolean }
+    ChecklistUpdate:
+      type: object
+      required: [completed]
+      properties:
+        completed: { type: boolean }
+    EscalationContact:
+      type: object
+      required: [id, name, role, phone, availability]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        role: { type: string }
+        phone: { type: string }
+        availability: { type: string }
+    SiteReport:
+      type: object
+      required: [date, site, coverage, attendance, patrolCompletion, openIssues, status]
+      properties:
+        date: { type: string }
+        site: { type: string }
+        coverage: { type: number }
+        attendance: { type: number }
+        patrolCompletion: { type: number }
+        openIssues: { type: number }
+        status: { type: string }
+    FieldOfficerLocation:
+      type: object
+      required: [id, name, city, dutyStatus, location, lastUpdate, coordinates, trackingWindow, heartbeatMinutes]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        city: { type: string }
+        dutyStatus: { type: string }
+        location: { type: string }
+        lastUpdate: { type: string }
+        trackingWindow: { type: string }
+        heartbeatMinutes: { type: number }
+        coordinates:
+          type: object
+          required: [x, y]
+          properties:
+            x: { type: number }
+            y: { type: number }
+    EmployeeSubmission:
+      type: object
+      required: [id, name, phone, city, submittedBy, submittedAt, status, documents, decisionAt, decisionBy, approvalPath]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        phone: { type: string }
+        city: { type: string }
+        submittedBy: { type: string }
+        submittedAt: { type: string }
+        status: { type: string }
+        documents: { type: number }
+        note: { type: ["string", "null"] }
+        decisionAt: { type: ["string", "null"] }
+        decisionBy: { type: ["string", "null"] }
+        approvalPath: { type: string }
+    EmployeeSubmissionInput:
+      type: object
+      required: [name, phone, city]
+      properties:
+        name: { type: string }
+        phone: { type: string }
+        city: { type: string }
+        note: { type: string }
+    EmployeeDecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [accepted, rejected, sent_back]
+        note: { type: string }
+    Payslip:
+      type: object
+      required: [id, period, netPay, releasedAt, status]
+      properties:
+        id: { type: string }
+        period: { type: string }
+        netPay: { type: number }
+        releasedAt: { type: string }
+        status: { type: string }
+    RequestRecord:
+      type: object
+      required: [id, type, summary, submittedAt, status, submittedBy, approvalPath]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        summary: { type: string }
+        submittedAt: { type: string }
+        status: { type: string }
+        submittedBy: { type: string }
+        approvalPath: { type: string }
+    ShiftRule:
+      type: object
+      required: [id, name, startTime, endTime]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        startTime: { type: string }
+        endTime: { type: string }
+    ChecklistRule:
+      type: object
+      required: [id, label, category, required]
+      properties:
+        id: { type: string }
+        label: { type: string }
+        category: { type: string }
+        required: { type: boolean }
+    TrackingRule:
+      type: object
+      required: [enabled, startTime, endTime, heartbeatMinutes, offlineAfterMinutes]
+      properties:
+        enabled: { type: boolean }
+        startTime: { type: string }
+        endTime: { type: string }
+        heartbeatMinutes: { type: number, minimum: 1 }
+        offlineAfterMinutes: { type: number, minimum: 1 }
+    ApprovalRules:
+      type: object
+      required: [verification, leave, salaryAdvance, bills]
+      properties:
+        verification:
+          type: array
+          items: { type: string }
+        leave:
+          type: array
+          items: { type: string }
+        salaryAdvance:
+          type: array
+          items: { type: string }
+        bills:
+          type: array
+          items: { type: string }
+    RequestRules:
+      type: object
+      required: [salaryAdvanceEnabled, salaryAdvanceMaxAmount, billSubmissionEnabled, billMaxAmount, billReceiptRequired]
+      properties:
+        salaryAdvanceEnabled: { type: boolean }
+        salaryAdvanceMaxAmount: { type: number, minimum: 1 }
+        billSubmissionEnabled: { type: boolean }
+        billMaxAmount: { type: number, minimum: 1 }
+        billReceiptRequired: { type: boolean }
+    OperatingPolicy:
+      type: object
+      required: [id, version, siteName, siteAddress, timezone, shifts, geofenceRadiusMeters, geofenceRequireInside, tracking, checklist, sosAcknowledgementMinutes, sosEscalationMessage, approvals, requests, updatedAt, updatedBy]
+      properties:
+        id: { type: string }
+        version: { type: number, minimum: 1 }
+        siteName: { type: string }
+        siteAddress: { type: string }
+        timezone: { type: string }
+        shifts:
+          type: array
+          items: { $ref: "#/components/schemas/ShiftRule" }
+        geofenceRadiusMeters: { type: number, minimum: 1 }
+        geofenceRequireInside: { type: boolean }
+        tracking:
+          $ref: "#/components/schemas/TrackingRule"
+        checklist:
+          type: array
+          items: { $ref: "#/components/schemas/ChecklistRule" }
+        sosAcknowledgementMinutes: { type: number, minimum: 1 }
+        sosEscalationMessage: { type: string }
+        approvals:
+          $ref: "#/components/schemas/ApprovalRules"
+        requests:
+          $ref: "#/components/schemas/RequestRules"
+        updatedAt: { type: string }
+        updatedBy: { type: string }
+    OperatingPolicyRevision:
+      type: object
+      required: [id, policyId, changedSections, before, after, actor, createdAt]
+      properties:
+        id: { type: string }
+        policyId: { type: string }
+        changedSections:
+          type: array
+          items: { type: string }
+        before:
+          type: object
+          additionalProperties: true
+          description: Previous values for each changed policy section.
+        after:
+          type: object
+          additionalProperties: true
+          description: New values for each changed policy section.
+        reason: { type: string, nullable: true }
+        actor: { type: string }
+        createdAt: { type: string }
+    OperatingPolicyUpdate:
+      type: object
+      required: [version, siteName, siteAddress, timezone, shifts, geofenceRadiusMeters, geofenceRequireInside, tracking, checklist, sosAcknowledgementMinutes, sosEscalationMessage, approvals, requests]
+      properties:
+        version: { type: number, minimum: 1 }
+        siteName: { type: string, minLength: 1 }
+        siteAddress: { type: string, minLength: 1 }
+        timezone: { type: string, minLength: 1 }
+        shifts:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/ShiftRule" }
+        geofenceRadiusMeters: { type: number, minimum: 1, maximum: 10000 }
+        geofenceRequireInside: { type: boolean }
+        tracking:
+          $ref: "#/components/schemas/TrackingRule"
+        checklist:
+          type: array
+          items: { $ref: "#/components/schemas/ChecklistRule" }
+        sosAcknowledgementMinutes: { type: number, minimum: 1, maximum: 120 }
+        sosEscalationMessage: { type: string, minLength: 1 }
+        changeReason: { type: string, maxLength: 500 }
+        approvals:
+          $ref: "#/components/schemas/ApprovalRules"
+        requests:
+          $ref: "#/components/schemas/RequestRules"
+    OperatingPolicyConflict:
+      type: object
+      required: [error, currentPolicy]
+      properties:
+        error: { type: string }
+        currentPolicy:
+          $ref: "#/components/schemas/OperatingPolicy"
+    LeaveRequestInput:
+      type: object
+      required: [from, to, reason]
+      properties:
+        from: { type: string }
+        to: { type: string }
+        reason: { type: string }
+    SalaryAdvanceInput:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount: { type: number }
+        reason: { type: string }
+    BillSubmissionInput:
+      type: object
+      required: [category, amount, billDate, vendor]
+      properties:
+        category: { type: string }
+        amount: { type: number }
+        billDate: { type: string }
+        vendor: { type: string }
+        receiptReference: { type: string }

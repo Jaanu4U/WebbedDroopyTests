@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "BlackBelt Commandos"
+description = "A role-based security workforce operations platform for attendance, patrol verification, emergency response, field submissions, employee verification, and live operational monitoring."
+version = "1.0.0"
+id = "artifacts/blackbelt-commandos"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22800
+
+[services.development]
+run = "pnpm --filter @workspace/blackbelt-commandos run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/blackbelt-commandos", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/blackbelt-commandos/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22800"
+BASE_PATH = "/"

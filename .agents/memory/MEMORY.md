@@ -1,0 +1,2 @@
+- [Policy integration test prerequisites](policy-integration-tests.md) — persistence checks require current shared declarations and a development database synchronized with the checked-in schema.
+- [API codegen integer compatibility](api-codegen-zod-compat.md) — use numeric OpenAPI schemas for positive integer-like fields when the installed Zod runtime lacks `zod.int()`.
