@@ -146,9 +146,64 @@ const policySectionLabels: Record<string, string> = {
 type PolicySection = 'site' | 'attendance' | 'tracking' | 'checklist' | 'sos' | 'approvals' | 'requests';
 type PolicyConflict = {
   rejectedDraft: OperatingPolicyUpdate;
+  basePolicy: OperatingPolicy;
   currentPolicy: OperatingPolicy;
 };
 type ConflictChoice = 'newer' | 'intended';
+type PersistedPolicyConflict = {
+  schemaVersion: 1;
+  draft: OperatingPolicyUpdate;
+  conflict: PolicyConflict;
+  choices: Partial<Record<PolicySection, ConflictChoice>>;
+};
+
+const policyConflictStoragePrefix = 'blackbelt-commandos:policy-conflict:';
+
+function policyConflictStorageKey(userId: string) {
+  return `${policyConflictStoragePrefix}${encodeURIComponent(userId)}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readPersistedPolicyConflict(storageKey: string): PersistedPolicyConflict | null {
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) return null;
+    const value: unknown = JSON.parse(raw);
+    if (
+      !isRecord(value) ||
+      value.schemaVersion !== 1 ||
+      !isRecord(value.draft) ||
+      !isRecord(value.conflict) ||
+      !isRecord(value.conflict.rejectedDraft) ||
+      !isRecord(value.conflict.basePolicy) ||
+      !isRecord(value.conflict.currentPolicy) ||
+      !isRecord(value.choices)
+    ) {
+      window.localStorage.removeItem(storageKey);
+      return null;
+    }
+    return value as PersistedPolicyConflict;
+  } catch {
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch {
+      // Storage can be unavailable in privacy-restricted browser contexts.
+    }
+    return null;
+  }
+}
+
+function clearPersistedPolicyConflict(storageKey: string | null) {
+  if (!storageKey) return;
+  try {
+    window.localStorage.removeItem(storageKey);
+  } catch {
+    // Storage can be unavailable in privacy-restricted browser contexts.
+  }
+}
 
 function policySectionSnapshots(policy: OperatingPolicy | OperatingPolicyUpdate): Record<PolicySection, unknown> {
   return {
@@ -175,6 +230,15 @@ function policySectionSnapshots(policy: OperatingPolicy | OperatingPolicyUpdate)
 
 function policySectionsEqual(left: unknown, right: unknown) {
   return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function applyPolicySection(
+  draft: OperatingPolicyUpdate,
+  section: PolicySection,
+  source: OperatingPolicy | OperatingPolicyUpdate,
+) {
+  const sectionValues = policySectionSnapshots(source)[section] as Partial<OperatingPolicyUpdate>;
+  return { ...draft, ...sectionValues };
 }
 
 type RevisionValueRow = { label: string; value: string };
@@ -479,6 +543,7 @@ function Payslips() {
 }
 
 function PolicySettings() {
+  const { user } = useUser();
   const policy = useGetOperatingPolicy();
   const revisionPageSize = 20;
   const [revisionOffset, setRevisionOffset] = useState(0);
@@ -491,22 +556,67 @@ function PolicySettings() {
   const update = useUpdateOperatingPolicy();
   const { toast } = useToast();
   const [draft, setDraft] = useState<OperatingPolicyUpdate>();
+  const [draftBasePolicy, setDraftBasePolicy] = useState<OperatingPolicy>();
   const [conflict, setConflict] = useState<PolicyConflict | null>(null);
   const [conflictChoices, setConflictChoices] = useState<Partial<Record<PolicySection, ConflictChoice>>>({});
   const [expandedRevisions, setExpandedRevisions] = useState<Record<string, boolean>>({});
   const [exportingRevisionId, setExportingRevisionId] = useState<string | null>(null);
+  const policyConflictKey = user?.id ? policyConflictStorageKey(user.id) : null;
+  const restoredConflictKey = useRef<string | null | undefined>(undefined);
+  const restoredConflict = useRef(false);
   const visibleRevisions = (revisions.data ?? []).slice(0, revisionPageSize);
   const hasOlderRevisions = (revisions.data?.length ?? 0) > revisionPageSize;
 
   useEffect(() => {
-    if (policy.data && !conflict) setDraft(policyToDraft(policy.data));
+    if (!policyConflictKey || restoredConflictKey.current === policyConflictKey) return;
+    restoredConflictKey.current = policyConflictKey;
+    const persisted = readPersistedPolicyConflict(policyConflictKey);
+    if (persisted) {
+      restoredConflict.current = true;
+      setDraft(persisted.draft);
+      setDraftBasePolicy(persisted.conflict.basePolicy);
+      setConflict(persisted.conflict);
+      setConflictChoices(persisted.choices);
+    } else {
+      restoredConflict.current = false;
+      setDraft(undefined);
+      setDraftBasePolicy(undefined);
+      setConflict(null);
+      setConflictChoices({});
+    }
+  }, [policyConflictKey]);
+
+  useEffect(() => {
+    if (policy.data && !conflict && !restoredConflict.current) {
+      setDraft(policyToDraft(policy.data));
+      setDraftBasePolicy(policy.data);
+    }
   }, [policy.data, conflict]);
+
+  useEffect(() => {
+    if (!policyConflictKey || !conflict || !draft) return;
+    const persisted: PersistedPolicyConflict = {
+      schemaVersion: 1,
+      draft,
+      conflict,
+      choices: conflictChoices,
+    };
+    try {
+      window.localStorage.setItem(policyConflictKey, JSON.stringify(persisted));
+    } catch {
+      // Storage can be unavailable or full; reconciliation still works in memory.
+    }
+  }, [policyConflictKey, draft, conflict, conflictChoices]);
 
   const conflictSections = conflict
     ? (Object.keys(policySectionLabels) as PolicySection[]).filter((section) =>
       !policySectionsEqual(
         policySectionSnapshots(conflict.rejectedDraft)[section],
         policySectionSnapshots(conflict.currentPolicy)[section],
+      ) &&
+      !policySectionsEqual(
+        policySectionSnapshots(conflict.rejectedDraft)[section],
+        policySectionSnapshots(conflict.basePolicy)[section],
       ),
     )
     : [];
@@ -515,15 +625,15 @@ function PolicySettings() {
   const chooseConflictValue = (section: PolicySection, choice: ConflictChoice) => {
     if (!conflict) return;
     const source = choice === 'newer' ? conflict.currentPolicy : conflict.rejectedDraft;
-    const sectionValues = policySectionSnapshots(source)[section] as Partial<OperatingPolicyUpdate>;
     setDraft((currentDraft: OperatingPolicyUpdate | undefined) => currentDraft
-      ? { ...currentDraft, ...sectionValues, version: conflict.currentPolicy.version }
+      ? { ...applyPolicySection(currentDraft, section, source), version: conflict.currentPolicy.version }
       : currentDraft);
     setConflictChoices((currentChoices) => ({ ...currentChoices, [section]: choice }));
   };
 
   const discardConflictDraft = () => {
     if (!conflict) return;
+    clearPersistedPolicyConflict(policyConflictKey);
     setDraft(policyToDraft(conflict.currentPolicy));
     setConflict(null);
     setConflictChoices({});
@@ -566,6 +676,7 @@ function PolicySettings() {
       : draft;
     update.mutate({ data: submission }, {
       onSuccess: () => {
+         clearPersistedPolicyConflict(policyConflictKey);
          setConflict(null);
          setConflictChoices({});
         setRevisionOffset(0);
@@ -580,16 +691,34 @@ function PolicySettings() {
          const data = error && typeof error === 'object' && 'data' in error
            ? (error as { data?: unknown }).data
            : undefined;
-         const conflict = data && typeof data === 'object' && 'currentPolicy' in data
+          const currentPolicy = data && typeof data === 'object' && 'currentPolicy' in data
            ? (data as { currentPolicy?: OperatingPolicy }).currentPolicy
            : undefined;
-         if (conflict) {
+          if (currentPolicy) {
+            const basePolicy = draftBasePolicy ?? policy.data;
+            if (!basePolicy) {
+              toast({ title: 'Policy could not be reconciled', description: 'Reload the policy and try again.', variant: 'destructive' });
+              return;
+            }
+            const baseSnapshots = policySectionSnapshots(basePolicy);
+            const rejectedSnapshots = policySectionSnapshots(draft);
+            const currentSnapshots = policySectionSnapshots(currentPolicy);
+            const mergedDraft = (Object.keys(policySectionLabels) as PolicySection[]).reduce(
+              (currentDraft, section) =>
+                policySectionsEqual(rejectedSnapshots[section], baseSnapshots[section]) &&
+                !policySectionsEqual(currentSnapshots[section], baseSnapshots[section])
+                  ? applyPolicySection(currentDraft, section, currentPolicy)
+                  : currentDraft,
+              draft,
+            );
             setConflict({
               rejectedDraft: draft,
-              currentPolicy: conflict,
+              basePolicy,
+              currentPolicy,
             });
+            setDraft({ ...mergedDraft, version: currentPolicy.version });
             setConflictChoices({});
-           queryClient.setQueryData(getGetOperatingPolicyQueryKey(), conflict);
+            queryClient.setQueryData(getGetOperatingPolicyQueryKey(), currentPolicy);
            queryClient.invalidateQueries({ queryKey: getGetOperatingPolicyRevisionsQueryKey() });
            toast({
              title: 'Policy changed by another manager',

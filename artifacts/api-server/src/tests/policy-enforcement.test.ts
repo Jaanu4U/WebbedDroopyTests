@@ -574,10 +574,7 @@ describe("operating policy enforcement", () => {
   });
 
   test("retrieves and exports policy handovers beyond the latest 20 revisions", async () => {
-    const [policy] = await db
-      .select({ id: operatingPoliciesTable.id })
-      .from(operatingPoliciesTable)
-      .limit(1);
+    const [policy] = await db.select().from(operatingPoliciesTable).limit(1);
     assert.ok(policy);
 
     const revisionIds = Array.from({ length: 25 }, () => randomUUID());
@@ -901,6 +898,162 @@ describe("operating policy enforcement", () => {
         (revision) => revision.reason === "Stale overwrite must not be recorded",
       ),
     );
+  });
+
+  test("reconciles a stale browser draft with an explicit choice for every changed section", async () => {
+    const loaded = await api<PolicyResponse>("/policies/operating");
+    assert.equal(loaded.status, 200);
+
+    const intendedRadius =
+      loaded.body.geofenceRadiusMeters < 10000
+        ? loaded.body.geofenceRadiusMeters + 25
+        : loaded.body.geofenceRadiusMeters - 25;
+    const newerRadius =
+      loaded.body.geofenceRadiusMeters < 10000
+        ? loaded.body.geofenceRadiusMeters + 50
+        : loaded.body.geofenceRadiusMeters - 50;
+    const intendedSiteName = `Policy draft before manager edit ${loaded.body.version}`;
+    const newerSiteName = `Policy saved by another manager ${loaded.body.version}`;
+    const intendedDraft = policyBody(loaded.body, {
+      siteName: intendedSiteName,
+      geofenceRadiusMeters: intendedRadius,
+      changeReason: "Browser conflict draft",
+    });
+
+    const winning = await patchPolicy(
+      policyBody(loaded.body, {
+        siteName: newerSiteName,
+        geofenceRadiusMeters: newerRadius,
+        changeReason: "Browser conflict winner",
+      }),
+    );
+    assert.equal(winning.status, 200);
+
+    const rejected = await patchPolicy<{
+      error: string;
+      currentPolicy: PolicyResponse;
+    }>(intendedDraft);
+    assert.equal(rejected.status, 409);
+    assert.match(rejected.body.error, /changed after you loaded it/i);
+
+    // The 409 response is the data the browser keeps beside its rejected draft
+    // to render the comparison instead of replacing the manager's work.
+    const newerPolicy = rejected.body.currentPolicy;
+    assert.equal(newerPolicy.version, winning.body.version);
+    assert.equal(newerPolicy.siteName, newerSiteName);
+    assert.equal(newerPolicy.geofenceRadiusMeters, newerRadius);
+    assert.equal(intendedDraft.siteName, intendedSiteName);
+    assert.equal(intendedDraft.geofenceRadiusMeters, intendedRadius);
+    assert.notEqual(intendedDraft.siteName, newerPolicy.siteName);
+    assert.notEqual(
+      intendedDraft.geofenceRadiusMeters,
+      newerPolicy.geofenceRadiusMeters,
+    );
+
+    const changedSections = ["site", "attendance"] as const;
+    const choices: Partial<Record<(typeof changedSections)[number], "newer" | "intended">> = {};
+    const canRetry = () =>
+      changedSections.every((section) => choices[section] !== undefined);
+    assert.equal(canRetry(), false);
+    choices.site = "newer";
+    assert.equal(canRetry(), false);
+    choices.attendance = "intended";
+    assert.equal(canRetry(), true);
+
+    const selectedChoices = choices as Record<
+      (typeof changedSections)[number],
+      "newer" | "intended"
+    >;
+    const retryPayload = {
+      ...intendedDraft,
+      version: newerPolicy.version,
+      siteName:
+        selectedChoices.site === "newer"
+          ? newerPolicy.siteName
+          : intendedDraft.siteName,
+      geofenceRadiusMeters:
+        selectedChoices.attendance === "newer"
+          ? newerPolicy.geofenceRadiusMeters
+          : intendedDraft.geofenceRadiusMeters,
+      changeReason: "Browser conflict resolved",
+    };
+    assert.equal(retryPayload.version, newerPolicy.version);
+    assert.equal(retryPayload.siteName, newerSiteName);
+    assert.equal(retryPayload.geofenceRadiusMeters, intendedRadius);
+
+    const retried = await patchPolicy(retryPayload);
+    assert.equal(retried.status, 200);
+    assert.equal(retried.body.version, newerPolicy.version + 1);
+    assert.equal(retried.body.siteName, newerSiteName);
+    assert.equal(retried.body.geofenceRadiusMeters, intendedRadius);
+  });
+
+  test("reconciles different-section browser drafts without overwriting either manager", async () => {
+    const loaded = await api<PolicyResponse>("/policies/operating");
+    assert.equal(loaded.status, 200);
+
+    const intendedSiteName = `Non-overlapping draft site ${loaded.body.version}`;
+    const intendedDraft = policyBody(loaded.body, {
+      siteName: intendedSiteName,
+      changeReason: "Non-overlapping browser draft",
+    });
+    const newerRadius =
+      loaded.body.geofenceRadiusMeters < 10000
+        ? loaded.body.geofenceRadiusMeters + 25
+        : loaded.body.geofenceRadiusMeters - 25;
+
+    const winning = await patchPolicy(
+      policyBody(loaded.body, {
+        geofenceRadiusMeters: newerRadius,
+        changeReason: "Non-overlapping browser winner",
+      }),
+    );
+    assert.equal(winning.status, 200);
+
+    const rejected = await patchPolicy<{
+      error: string;
+      currentPolicy: PolicyResponse;
+    }>(intendedDraft);
+    assert.equal(rejected.status, 409);
+    assert.match(rejected.body.error, /changed after you loaded it/i);
+
+    const newerPolicy = rejected.body.currentPolicy;
+    assert.equal(newerPolicy.version, winning.body.version);
+    assert.equal(newerPolicy.geofenceRadiusMeters, newerRadius);
+    assert.equal(intendedDraft.siteName, intendedSiteName);
+    assert.equal(intendedDraft.geofenceRadiusMeters, loaded.body.geofenceRadiusMeters);
+
+    // A browser conflict needs a decision only for a section the stale manager
+    // edited. The winner-only section is merged from the newer policy before retry.
+    const changedSections = [
+      [
+        "site",
+        intendedDraft.siteName !== loaded.body.siteName &&
+          intendedDraft.siteName !== newerPolicy.siteName,
+      ],
+      [
+        "attendance",
+        intendedDraft.geofenceRadiusMeters !== loaded.body.geofenceRadiusMeters &&
+          intendedDraft.geofenceRadiusMeters !== newerPolicy.geofenceRadiusMeters,
+      ],
+    ]
+      .filter(([, differs]) => differs)
+      .map(([section]) => section);
+    assert.deepEqual(changedSections, ["site"]);
+    const retryPayload = {
+      ...intendedDraft,
+      version: newerPolicy.version,
+      geofenceRadiusMeters: newerPolicy.geofenceRadiusMeters,
+      changeReason: "Non-overlapping browser draft resolved",
+    };
+    assert.equal(retryPayload.siteName, intendedSiteName);
+    assert.equal(retryPayload.geofenceRadiusMeters, newerRadius);
+
+    const retried = await patchPolicy(retryPayload);
+    assert.equal(retried.status, 200);
+    assert.equal(retried.body.version, newerPolicy.version + 1);
+    assert.equal(retried.body.siteName, intendedSiteName);
+    assert.equal(retried.body.geofenceRadiusMeters, newerRadius);
   });
 
   test("prevents non-management roles from updating policy", async () => {
